@@ -6,7 +6,7 @@ import { RenderCache } from "../src/services/cache";
 import { follow } from "../src/styles/builtin/follow";
 import { midnight } from "../src/styles/builtin/midnight";
 import { resolveLayout } from "../src/pipeline/layout";
-import { FakeExportDialog, GRAPH, makeDeps, sleep } from "./pipeline.test-utils";
+import { FakeExportDialog, GRAPH, makeDeps, sleep, waitFor } from "./pipeline.test-utils";
 
 describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 	it("离屏分离树：connected=false 的容器也要渲染（回归：启动全灭）", async () => {
@@ -215,10 +215,10 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		await sleep(0);
 		expect(fake.calls.map((c) => c.options?.filename)).toEqual(["a-1", "a-2"]);
 
-		// 重渲染：按钮唯一且编号不变
+		// 重渲染：按钮唯一且编号不变（轮询等待新按钮就位，避免负载下误判）
 		settings.defaultStyleId = "paper";
 		processor.rerenderAll();
-		await sleep(800);
+		await waitFor(() => el1.querySelector(".best-mermaid-export") !== null);
 		expect(el1.querySelectorAll(".best-mermaid-export")).toHaveLength(1);
 		el1.querySelector<HTMLButtonElement>(".best-mermaid-export")!.click();
 		await sleep(0);

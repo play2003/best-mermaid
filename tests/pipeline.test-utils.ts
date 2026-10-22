@@ -15,6 +15,15 @@ import type { PipelineDeps, PngExportOptions } from "../src/types";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** 轮询等待条件成立（替代固定 sleep，避免机器负载导致的偶发失败） */
+export async function waitFor(cond: () => boolean, timeout = 8000): Promise<void> {
+	const start = Date.now();
+	while (!cond()) {
+		if (Date.now() - start > timeout) throw new Error("waitFor timeout");
+		await sleep(50);
+	}
+}
+
 export const GRAPH = "flowchart LR\n    A[Start] --> B[End]";
 
 /** 测试用导出对话框：只记录打开请求，不触达 Obsidian UI */
