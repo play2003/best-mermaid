@@ -65,7 +65,7 @@ export class RenderEngine {
 				config.elk = {};
 				if (!this.elkWarned) {
 					this.elkWarned = true;
-					console.warn("[best-mermaid] elk 布局引擎不可用，已降级 dagre：", e);
+					console.warn("[best-mermaid] elk layout engine unavailable, falling back to dagre:", e);
 				}
 			}
 		}

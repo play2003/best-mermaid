@@ -26,7 +26,6 @@ export default class BestMermaidPlugin extends Plugin {
 	private cache!: RenderCache;
 
 	async onload() {
-		console.log("[best-mermaid] loaded v" + this.manifest.version);
 		await this.loadSettings();
 
 		// 装配：样式注册表（内置卡在编译期固定，用户卡来自 data.json）

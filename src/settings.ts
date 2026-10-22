@@ -47,8 +47,40 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		this.renderStyleGallery();
 
 		new Setting(containerEl)
-			.setName("渲染防抖")
-			.setDesc("输入源码时延迟渲染的毫秒数")
+			.setName("Layout engine")
+			.setDesc("elk provides professional orthogonal edge routing (loaded on demand)")
+			.addDropdown((d) =>
+				d
+					.addOptions({
+						auto: "Auto (follow style)",
+						dagre: "dagre (default)",
+						elk: "elk (experimental)",
+					})
+					.setValue(this.plugin.settings.layoutEngine)
+					.onChange(async (v) => {
+						this.plugin.settings.layoutEngine = v as BestMermaidSettings["layoutEngine"];
+						await this.plugin.saveSettings();
+						this.plugin.onStyleChange();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Horizontal alignment")
+			.setDesc("Horizontal position of rendered diagrams")
+			.addDropdown((d) =>
+				d
+					.addOptions({ left: "Left", center: "Center", right: "Right" })
+					.setValue(this.plugin.settings.imageAlign)
+					.onChange(async (v) => {
+						this.plugin.settings.imageAlign = v as BestMermaidSettings["imageAlign"];
+						await this.plugin.saveSettings();
+						this.plugin.onStyleChange();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Render debounce")
+			.setDesc("Delay in milliseconds before re-rendering while typing")
 			.addText((t) =>
 				t.setValue(String(this.plugin.settings.debounceMs)).onChange(async (v) => {
 					const n = Number(v);
@@ -60,47 +92,21 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("启用缩放/平移")
+			.setName("Enable zoom and pan")
 			.addToggle((t) =>
 				t.setValue(this.plugin.settings.zoomEnabled).onChange(async (v) => {
 					this.plugin.settings.zoomEnabled = v;
 					await this.plugin.saveSettings();
 				}),
 			);
-
-		new Setting(containerEl)
-			.setName("水平对齐")
-			.setDesc("渲染结果在容器内的水平位置")
-			.addDropdown((d) =>
-				d
-					.addOptions({ left: "左对齐", center: "居中", right: "右对齐" })
-					.setValue(this.plugin.settings.imageAlign)
-					.onChange(async (v) => {
-						this.plugin.settings.imageAlign = v as BestMermaidSettings["imageAlign"];
-						await this.plugin.saveSettings();
-						this.plugin.onStyleChange();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("布局引擎")
-			.setDesc("elk 提供专业级正交布线与交叉最小化（体积较大，按需加载）")
-			.addDropdown((d) =>
-				d
-					.addOptions({ auto: "自动（跟随样式）", dagre: "dagre（默认）", elk: "elk（实验性）" })
-					.setValue(this.plugin.settings.layoutEngine)
-					.onChange(async (v) => {
-						this.plugin.settings.layoutEngine = v as BestMermaidSettings["layoutEngine"];
-						await this.plugin.saveSettings();
-						this.plugin.onStyleChange();
-					}),
-			);
 	}
 
 	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作） */
 	private renderStyleGallery(): void {
 		const section = this.containerEl.createDiv({ cls: "bm-style-section" });
-		new Setting(section).setName("样式").setDesc("全局默认样式，图内可用 %% bm-style: <id> %% 指令覆盖");
+		new Setting(section)
+			.setName("Styles")
+			.setDesc("Default style for diagrams. Override per diagram with %% bm-style: <id> %%");
 
 		const grid = section.createDiv({ cls: "bm-style-grid" });
 		for (const style of this.plugin.registry.list()) {
@@ -125,18 +131,18 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		const title = card.createDiv({ cls: "bm-style-title" });
 		title.createSpan({ text: style.name });
 		if (style.id === this.plugin.settings.defaultStyleId) {
-			title.createSpan({ cls: "bm-style-current", text: "当前" });
+			title.createSpan({ cls: "bm-style-current", text: "Current" });
 		}
 
 		if (style.description) card.createDiv({ cls: "bm-style-desc", text: style.description });
 		card.createDiv({
 			cls: "bm-style-mode",
-			text: style.mode === "dynamic" ? "跟随主题" : "固定配色",
+			text: style.mode === "dynamic" ? "Follows theme" : "Fixed palette",
 		});
 
 		const actions = card.createDiv({ cls: "bm-style-actions" });
 		if (style.id !== this.plugin.settings.defaultStyleId) {
-			actions.createEl("button", { text: "设为默认" }).addEventListener("click", async () => {
+			actions.createEl("button", { text: "Set as default" }).addEventListener("click", async () => {
 				this.plugin.settings.defaultStyleId = style.id;
 				await this.plugin.saveSettings();
 				this.plugin.onStyleChange();
@@ -144,7 +150,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			});
 		}
 		if (!this.plugin.registry.isBuiltin(style.id)) {
-			actions.createEl("button", { text: "删除" }).addEventListener("click", () => {
+			actions.createEl("button", { text: "Delete" }).addEventListener("click", () => {
 				this.plugin.registry.deleteUser(style.id);
 				this.display();
 			});

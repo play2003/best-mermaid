@@ -8,7 +8,10 @@ export class ErrorBoundary {
 		const suspectLine = this.suspectLine(msg);
 
 		const box = el.createDiv({ cls: "best-mermaid-error" });
-		box.createDiv({ cls: "bm-error-msg", text: `Mermaid 渲染失败${suspectLine ? `（疑似第 ${suspectLine} 行）` : ""}` });
+		box.createDiv({
+			cls: "bm-error-msg",
+			text: `Mermaid render failed${suspectLine ? ` (near line ${suspectLine})` : ""}`,
+		});
 		box.createDiv({ cls: "bm-error-detail", text: msg });
 		if (suspectLine !== null) {
 			const lines = source.split("\n");

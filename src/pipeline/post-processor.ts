@@ -9,9 +9,15 @@ export class PostProcessor {
 		// svg 包一层 wrapper：水平对齐的 flex 布局只作用于 svg，
 		// 容器内的其他子节点（角标、其他插件注入的按钮）不参与布局
 		const wrap = el.createDiv({ cls: "best-mermaid-wrap" });
-		wrap.innerHTML = svgString;
-		const svg = wrap.querySelector("svg");
+
+		// 用 DOMParser + importNode 注入（官方规范禁用 innerHTML；
+		// DOMParser 创建的文档中脚本不会执行，天然安全）
+		const parsed = new DOMParser().parseFromString(svgString, "image/svg+xml");
+		const parsedSvg = parsed.documentElement;
+		if (!parsedSvg || parsedSvg.nodeName !== "svg") return null;
+		const svg = document.importNode(parsedSvg, true);
 		if (!(svg instanceof SVGSVGElement)) return null;
+		wrap.appendChild(svg);
 
 		// 保留 mermaid 计算的自然尺寸上限（内联 max-width: Npx）：
 		// 窄图不拉伸到容器宽度（否则 viewBox 等比放大导致字号异常），
