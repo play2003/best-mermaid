@@ -13,7 +13,9 @@ Install it, open a note, and it just looks right.
 - ✦ **Style packs** — one line switches a diagram to a print-ready or presentation look
 - ✦ **Stays offline** — mermaid and elk are bundled; nothing leaves your vault
 
-<!-- TODO: add screenshots before release (./images/screenshot-styles.png, ./images/screenshot-zoom.png) -->
+![Before vs after Best Mermaid](./images/style-comparison.png)
+
+*Left: the default Obsidian mermaid renderer. Right: Best Mermaid with the Paper style — theme-matched grayscale palette and clean orthogonal routing.*
 
 ## Why another mermaid plugin?
 

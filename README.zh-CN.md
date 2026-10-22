@@ -13,7 +13,9 @@
 - ✦ **样式卡** —— 一行指令让图切换到印刷风或演示风
 - ✦ **完全离线** —— mermaid 与 elk 均已打包，数据不出 vault
 
-<!-- TODO: 发布前补充截图 (./images/screenshot-styles.png, ./images/screenshot-zoom.png) -->
+![使用前后对比](./images/style-comparison.png)
+
+*左：Obsidian 默认 mermaid 渲染。右：Best Mermaid 的论文黑白样式——贴合主题的灰阶配色与干净的正交布线。*
 
 ## 为什么还要一个 mermaid 插件？
 
