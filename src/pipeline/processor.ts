@@ -8,6 +8,8 @@ import { resolveLayout } from "./layout";
  */
 export class MermaidBlockProcessor {
 	private timers = new WeakMap<HTMLElement, number>();
+	/** 每容器渲染序号：仅最新一轮可落笔，防止并发渲染双写 */
+	private seq = new WeakMap<HTMLElement, number>();
 	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
 	private version = 0;
 	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
@@ -73,6 +75,11 @@ export class MermaidBlockProcessor {
 	}
 
 	private async render(source: string, el: HTMLElement, opts: { skipDebounce?: boolean } = {}): Promise<void> {
+		// 渲染序号：容器上同刻只允许最新一轮渲染落笔（守卫夺回与排队渲染并发时，
+		// 旧一轮的 await 迟于新一轮完成，会把重复 SVG 叠加写入）
+		const seq = (this.seq.get(el) ?? 0) + 1;
+		this.seq.set(el, seq);
+
 		// 注意：不做 isConnected 守卫——启动时 Obsidian 在离屏分离树上跑处理器链，
 		// connected=false 是合法的"延迟挂载"状态，渲染结果会随后续挂载显示。
 		// 若容器真被替换，代价只是一次多余渲染，新一代容器会走自己的渲染并胜出。
@@ -103,6 +110,9 @@ export class MermaidBlockProcessor {
 				svg = await this.deps.engine.render(normalized.source, theme, directive);
 				this.deps.cache.put(cacheKey, svg);
 			}
+
+			// await 期间可能有更新一轮的渲染已启动：本轮过期，放弃落笔
+			if (this.seq.get(el) !== seq) return;
 
 			const svgEl = this.deps.postProcessor.enhance(el, svg);
 			if (svgEl) this.deps.interaction.attach(el, svgEl);
