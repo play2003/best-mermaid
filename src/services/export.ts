@@ -49,7 +49,8 @@ export function fitExportSize(
  * 来自系统字体栈，通常可正常光栅化，自定义主题字体在无系统同名时退化到栈内下一字体。
  */
 export class ExportService implements PngExporter {
-	async exportPng(svg: SVGSVGElement, options: PngExportOptions = {}): Promise<void> {
+	/** 光栅化为 PNG Blob（不保存）；保存方式由调用方决定（原生对话框/下载） */
+	async renderPng(svg: SVGSVGElement, options: PngExportOptions = {}): Promise<Blob> {
 		const { clone, width, height } = this.prepareClone(svg);
 		const scale = options.scale ?? 2;
 		const fit = fitExportSize(width, height, scale);
@@ -77,11 +78,16 @@ export class ExportService implements PngExporter {
 			ctx.imageSmoothingQuality = "high";
 			ctx.drawImage(img, 0, 0);
 
-			const blob = await this.toBlob(canvas);
-			this.download(blob, `${options.filename ?? "mermaid"}.png`);
+			return await this.toBlob(canvas);
 		} finally {
 			URL.revokeObjectURL(url);
 		}
+	}
+
+	/** 无对话框时的兜底导出：直接走浏览器下载 */
+	async exportPng(svg: SVGSVGElement, options: PngExportOptions = {}): Promise<void> {
+		const blob = await this.renderPng(svg, options);
+		this.download(blob, `${options.filename ?? "mermaid"}.png`);
 	}
 
 	exportSvg(svg: SVGSVGElement, filename = "mermaid"): void {

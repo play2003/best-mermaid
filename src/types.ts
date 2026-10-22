@@ -54,5 +54,6 @@ export interface PipelineDeps {
 	postProcessor: import("./pipeline/post-processor").PostProcessor;
 	errorBoundary: import("./services/error-boundary").ErrorBoundary;
 	interaction: import("./services/interaction").InteractionService;
-	exporter: PngExporter;
+	/** 打开导出对话框（UI 归入口层，pipeline 只发请求） */
+	openExportDialog: (svg: SVGSVGElement, defaults: PngExportOptions) => void;
 }

@@ -30,6 +30,15 @@ const en: Dict = {
 	renderFailed: "Mermaid render failed",
 	nearLine: "(near line",
 	exportPng: "Export PNG",
+	exportTitle: "Export diagram as PNG",
+	fileName: "File name",
+	quality: "Image quality",
+	exportBtn: "Export",
+	cancel: "Cancel",
+	exportedTo: "Exported to",
+	exportCancelled: "Export cancelled",
+	exportFailed: "Export failed",
+	downloadsFolder: "Downloads folder: ",
 };
 
 const zh: Dict = {
@@ -56,6 +65,15 @@ const zh: Dict = {
 	renderFailed: "Mermaid 渲染失败",
 	nearLine: "（疑似第",
 	exportPng: "导出 PNG",
+	exportTitle: "导出图表为 PNG",
+	fileName: "文件名",
+	quality: "图片质量",
+	exportBtn: "导出",
+	cancel: "取消",
+	exportedTo: "已导出到",
+	exportCancelled: "已取消导出",
+	exportFailed: "导出失败",
+	downloadsFolder: "下载目录：",
 };
 
 export function t(key: string): string {

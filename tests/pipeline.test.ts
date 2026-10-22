@@ -6,7 +6,7 @@ import { RenderCache } from "../src/services/cache";
 import { follow } from "../src/styles/builtin/follow";
 import { midnight } from "../src/styles/builtin/midnight";
 import { resolveLayout } from "../src/pipeline/layout";
-import { FakeExporter, GRAPH, makeDeps, sleep } from "./pipeline.test-utils";
+import { FakeExportDialog, GRAPH, makeDeps, sleep } from "./pipeline.test-utils";
 
 describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 	it("离屏分离树：connected=false 的容器也要渲染（回归：启动全灭）", async () => {
@@ -159,9 +159,9 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		expect(el.querySelector(".best-mermaid-wrap")).toBeTruthy();
 	});
 
-	it("导出按钮：图右下角、点击调用导出器（文件名/背景）", async () => {
-		const fake = new FakeExporter();
-		const { deps } = makeDeps({ defaultStyleId: "midnight" }, { exporter: fake });
+	it("导出按钮：预览区右下角、点击打开导出对话框（文件名/背景）", async () => {
+		const fake = new FakeExportDialog();
+		const { deps } = makeDeps({ defaultStyleId: "midnight" }, { openExportDialog: fake.open });
 		const processor = new MermaidBlockProcessor(deps);
 		const el = document.createElement("div");
 		document.body.appendChild(el);
@@ -182,14 +182,13 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		expect(fake.calls[0].options).toMatchObject({
 			filename: "架构 笔记-1",
 			background: "#0f172a",
-			scale: 2,
 		});
 		expect(fake.calls[0].svg.tagName.toLowerCase()).toBe("svg");
 	});
 
 	it("导出文件名：同笔记第二张图序号递增，重渲染后保持稳定且按钮唯一", async () => {
-		const fake = new FakeExporter();
-		const { deps, settings } = makeDeps({ defaultStyleId: "midnight" }, { exporter: fake });
+		const fake = new FakeExportDialog();
+		const { deps, settings } = makeDeps({ defaultStyleId: "midnight" }, { openExportDialog: fake.open });
 		const processor = new MermaidBlockProcessor(deps);
 
 		const el1 = document.createElement("div");

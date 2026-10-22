@@ -137,7 +137,7 @@ export class MermaidBlockProcessor {
 			const background = this.exportBackground(theme, directive);
 
 			const svgEl = this.deps.postProcessor.enhance(el, svg, (target) =>
-				this.deps.exporter.exportPng(target, { filename, background, scale: 2 }),
+				this.deps.openExportDialog(target, { filename, background }),
 			);
 			if (svgEl) this.deps.interaction.attach(el, svgEl);
 			this.attachGuard(el, source);

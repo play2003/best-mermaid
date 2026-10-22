@@ -11,6 +11,7 @@ import { ThemeService } from "./services/theme-service";
 import { ErrorBoundary } from "./services/error-boundary";
 import { InteractionService } from "./services/interaction";
 import { ExportService } from "./services/export";
+import { ExportDialog } from "./ui/export-dialog";
 import { StyleRegistry } from "./styles/registry";
 import { follow } from "./styles/builtin/follow";
 import { midnight } from "./styles/builtin/midnight";
@@ -35,6 +36,7 @@ export default class BestMermaidPlugin extends Plugin {
 		// 装配：服务层
 		this.cache = new RenderCache(this.settings.cacheLimit);
 		this.themeService = new ThemeService(() => this.onThemeChange());
+		const exporter = new ExportService();
 		// 装配：管线层（依赖注入，pipeline 不感知 services）
 		const deps: PipelineDeps = {
 			getSettings: () => this.settings,
@@ -46,7 +48,7 @@ export default class BestMermaidPlugin extends Plugin {
 			postProcessor: new PostProcessor(),
 			errorBoundary: new ErrorBoundary(),
 			interaction: new InteractionService(() => this.settings.zoomEnabled),
-			exporter: new ExportService(),
+			openExportDialog: (svg, defaults) => new ExportDialog(this.app, svg, defaults, exporter).open(),
 		};
 		this.processor = new MermaidBlockProcessor(deps);
 		this.processor.startWatch();
