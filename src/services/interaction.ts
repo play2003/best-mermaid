@@ -30,6 +30,8 @@ export class InteractionService {
 		};
 
 		let dragging = false;
+		/** pointerdown 已按下并进入平移候选（用于抬手时恢复选择状态） */
+		let panArmed = false;
 		let downX = 0;
 		let downY = 0;
 		let lastX = 0;
@@ -83,6 +85,12 @@ export class InteractionService {
 		const onDown = (ev: PointerEvent) => {
 			if (isOverlayTarget(ev.target)) return;
 			if (ev.button !== 0 || state.scale <= 1) return; // 未放大时不抢占，文本可选中
+			// 关键：浏览器在首次轻微移动时就会建立文字选区，若等超过 5px 阈值再禁用，
+			// 选区已启动且难以可靠取消（偶发拖拽时选中文字）。这里当场阻止默认行为
+			// 并立即关闭选择，抬手时恢复。
+			ev.preventDefault();
+			panArmed = true;
+			container.style.userSelect = "none";
 			downX = ev.clientX;
 			downY = ev.clientY;
 			container.setPointerCapture(ev.pointerId);
@@ -93,7 +101,6 @@ export class InteractionService {
 			if (!dragging && Math.hypot(ev.clientX - downX, ev.clientY - downY) < DRAG_THRESHOLD) return;
 			if (!dragging) {
 				dragging = true;
-				container.style.userSelect = "none"; // 拖拽期间禁止选字
 				lastX = ev.clientX;
 				lastY = ev.clientY;
 			}
@@ -105,9 +112,10 @@ export class InteractionService {
 		};
 
 		const onUp = (ev: PointerEvent) => {
-			if (!dragging) return;
+			if (!panArmed) return;
+			panArmed = false;
 			dragging = false;
-			container.style.userSelect = "";
+			container.style.userSelect = ""; // 恢复文本选择（未移动的单击也走这里）
 			try {
 				container.releasePointerCapture(ev.pointerId);
 			} catch {

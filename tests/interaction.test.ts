@@ -36,4 +36,20 @@ describe("交互层：导出按钮不参与缩放/拖拽/双击手势", () => {
 		btn.dispatchEvent(wheel);
 		expect(wheel.defaultPrevented).toBe(false);
 	});
+
+	it("放大态 pointerdown 立即阻止默认行为并禁用选择（回归：拖拽时偶发选中文字）", () => {
+		const { container, svg } = setup();
+		const down = new PointerEvent("pointerdown", { button: 0, bubbles: true, cancelable: true });
+		svg.dispatchEvent(down);
+
+		expect(down.defaultPrevented).toBe(true); // 选区不会在阈值判定前启动
+		expect(container.style.userSelect).toBe("none");
+	});
+
+	it("抬手后恢复文字选择", () => {
+		const { container, svg } = setup();
+		svg.dispatchEvent(new PointerEvent("pointerdown", { button: 0, bubbles: true, cancelable: true }));
+		svg.dispatchEvent(new PointerEvent("pointerup", { button: 0, bubbles: true }));
+		expect(container.style.userSelect).toBe("");
+	});
 });
