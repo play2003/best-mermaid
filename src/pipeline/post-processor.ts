@@ -10,13 +10,10 @@ export class PostProcessor {
 		// 容器内的其他子节点（角标、其他插件注入的按钮）不参与布局
 		const wrap = el.createDiv({ cls: "best-mermaid-wrap" });
 
-		// 用 DOMParser + importNode 注入（官方规范禁用 innerHTML；
-		// DOMParser 创建的文档中脚本不会执行，天然安全）
-		const parsed = new DOMParser().parseFromString(svgString, "image/svg+xml");
-		const parsedSvg = parsed.documentElement;
-		if (!parsedSvg || parsedSvg.nodeName !== "svg") return null;
-		const svg = document.importNode(parsedSvg, true);
-		if (!(svg instanceof SVGSVGElement)) return null;
+		// 官方规范禁用 innerHTML；DOMParser 严格 XML 解析优先（脚本不执行，安全）
+		const svg = this.parseSvg(svgString);
+		// 解析失败必须可见化——曾因静默返回 null 导致部分图无声消失、无错误框
+		if (!svg) throw new Error("Failed to parse rendered SVG");
 		wrap.appendChild(svg);
 
 		// 保留 mermaid 计算的自然尺寸上限（内联 max-width: Npx）：
@@ -29,5 +26,24 @@ export class PostProcessor {
 
 		// TODO(M3)：为交互（节点点击、全屏预览）注入 data 属性
 		return svg;
+	}
+
+	/**
+	 * 解析 mermaid 输出的 SVG：
+	 * 1) 严格 XML（image/svg+xml）——干净安全的默认路径
+	 * 2) XML 失败时用 Range 的 HTML 片段解析器兜底——mermaid 的 htmlLabels 会输出
+	 *    HTML 风格标记（如未自闭合的 <br>），在 XML 下是非法文档
+	 * 两条路径都是惰性解析，脚本不会执行。
+	 */
+	private parseSvg(svgString: string): SVGSVGElement | null {
+		const xmlDoc = new DOMParser().parseFromString(svgString, "image/svg+xml");
+		const root = xmlDoc.documentElement;
+		if (root && root.nodeName === "svg") {
+			const imported = document.importNode(root, true);
+			if (imported instanceof SVGSVGElement) return imported;
+		}
+		const fragment = document.createRange().createContextualFragment(svgString);
+		const svg = fragment.querySelector("svg");
+		return svg instanceof SVGSVGElement ? svg : null;
 	}
 }
