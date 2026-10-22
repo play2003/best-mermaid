@@ -52,4 +52,37 @@ describe("交互层：导出按钮不参与缩放/拖拽/双击手势", () => {
 		svg.dispatchEvent(new PointerEvent("pointerup", { button: 0, bubbles: true }));
 		expect(container.style.userSelect).toBe("");
 	});
+
+	it("缩放时清除图内的文字选区（回归：1x 选中后放大高亮残留）", () => {
+		const { container, svg } = setup();
+		const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+		text.textContent = "hello";
+		svg.appendChild(text);
+
+		const range = document.createRange();
+		range.selectNodeContents(text);
+		const selection = window.getSelection()!;
+		selection.removeAllRanges();
+		selection.addRange(range);
+		expect(selection.isCollapsed).toBe(false);
+
+		container.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, bubbles: true, cancelable: true }));
+		expect(selection.isCollapsed).toBe(true);
+	});
+
+	it("页面其他位置的选区不受缩放影响", () => {
+		const { container } = setup();
+		const outside = document.createElement("p");
+		outside.textContent = "outside text";
+		document.body.appendChild(outside);
+
+		const range = document.createRange();
+		range.selectNodeContents(outside);
+		const selection = window.getSelection()!;
+		selection.removeAllRanges();
+		selection.addRange(range);
+
+		container.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, bubbles: true, cancelable: true }));
+		expect(selection.isCollapsed).toBe(false);
+	});
 });

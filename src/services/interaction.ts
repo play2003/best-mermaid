@@ -48,8 +48,19 @@ export class InteractionService {
 			container.style.cursor = state.scale > 1 ? (dragging ? "grabbing" : "grab") : "";
 		};
 
+		/** 清除落在本图容器内的文字选区（缩放手势开始时调用；不影响页面上其他选区） */
+		const clearOwnSelection = () => {
+			const selection = window.getSelection();
+			if (!selection || selection.isCollapsed) return;
+			const inContainer = (node: Node | null) => !!node && container.contains(node);
+			if (inContainer(selection.anchorNode) || inContainer(selection.focusNode)) {
+				selection.removeAllRanges();
+			}
+		};
+
 		/** 以 (clientX, clientY) 为锚点缩放：保持鼠标下的图内容不动 */
 		const zoomAt = (clientX: number, clientY: number, factor: number) => {
+			clearOwnSelection(); // 1x 时选中的文字高亮不应带进放大后的视图
 			const rect = container.getBoundingClientRect();
 			const px = clientX - rect.left;
 			const py = clientY - rect.top;
