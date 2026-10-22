@@ -1,5 +1,7 @@
 # Best Mermaid
 
+English | [简体中文](./README.zh-CN.md)
+
 **Diagrams that feel like they belong in your notes.**
 
 Your notes have a theme. Your diagrams don't — the same purple boxes, mismatched fonts, and edges that cross like spaghetti. Best Mermaid re-renders every mermaid diagram in your vault with your theme's own colors, curated styles, and professional layout. No configuration. No new syntax.
