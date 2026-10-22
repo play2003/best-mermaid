@@ -1,0 +1,9 @@
+{
+	"id": "best-mermaid",
+	"name": "Best Mermaid",
+	"version": "0.1.0",
+	"minAppVersion": "1.4.0",
+	"description": "接管 mermaid 渲染：主题融合、缩放平移、导出 SVG/PNG、错误可视化。",
+	"author": "best-mermaid",
+	"isDesktopOnly": false
+}

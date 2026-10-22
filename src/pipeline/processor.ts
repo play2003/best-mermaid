@@ -1,0 +1,139 @@
+import type { MarkdownPostProcessorContext } from "obsidian";
+import type { PipelineDeps } from "../types";
+import { resolveLayout } from "./layout";
+
+/**
+ * 代码块处理器：渲染管线的调度入口。
+ * 职责极薄 —— 防抖调度 + 容器管理，不含渲染逻辑。
+ */
+export class MermaidBlockProcessor {
+	private timers = new WeakMap<HTMLElement, number>();
+	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
+	private version = 0;
+	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
+	private observer: MutationObserver | null = null;
+
+	constructor(private deps: PipelineDeps) {}
+
+	/** 插件 onload 时启动（onunload 调 stopWatch 清理） */
+	startWatch(): void {
+		if (this.observer) return;
+		this.observer = new MutationObserver((mutations) => {
+			for (const m of mutations) {
+				for (const node of Array.from(m.addedNodes)) {
+					if (!(node instanceof HTMLElement)) continue;
+					const targets = node.matches(".best-mermaid-container")
+						? [node]
+						: Array.from(node.querySelectorAll<HTMLElement>(".best-mermaid-container"));
+					for (const el of targets) {
+						const src = el.dataset.bmSource;
+						if (src !== undefined && el.dataset.bmVersion !== String(this.version)) {
+							void this.render(src, el);
+						}
+					}
+				}
+			}
+		});
+		this.observer.observe(document.body, { childList: true, subtree: true });
+	}
+
+	stopWatch(): void {
+		this.observer?.disconnect();
+		this.observer = null;
+	}
+
+	handle = (source: string, el: HTMLElement, _ctx: MarkdownPostProcessorContext): void => {
+		const prev = this.timers.get(el);
+		if (prev !== undefined) window.clearTimeout(prev);
+
+		const timer = window.setTimeout(() => {
+			this.timers.delete(el);
+			void this.render(source, el);
+		}, this.deps.getSettings().debounceMs);
+
+		this.timers.set(el, timer);
+	};
+
+	/**
+	 * 主题/样式切换等场景：清缓存后全量重渲染。
+	 * 以 DOM 为准收集存活容器，不信任内存引用——启动时 Obsidian 在离屏分离树上
+	 * 跑处理器链，挂载时的容器与处理器见到的可能不是同一节点，
+	 * 内存集合里会残留"尸体"引用，导致部分图漏更新。
+	 */
+	rerenderAll(): void {
+		this.version++; // 使所有现存渲染过期
+		for (const el of Array.from(document.querySelectorAll<HTMLElement>(".best-mermaid-container"))) {
+			const src = el.dataset.bmSource;
+			if (src !== undefined) void this.render(src, el);
+		}
+	}
+
+	private async render(source: string, el: HTMLElement, opts: { skipDebounce?: boolean } = {}): Promise<void> {
+		// 注意：不做 isConnected 守卫——启动时 Obsidian 在离屏分离树上跑处理器链，
+		// connected=false 是合法的"延迟挂载"状态，渲染结果会随后续挂载显示。
+		// 若容器真被替换，代价只是一次多余渲染，新一代容器会走自己的渲染并胜出。
+		el.dataset.bmSource = source;
+		el.dataset.bmVersion = String(this.version);
+		el.addClass("best-mermaid-container");
+		// 水平对齐：容器可能复用，先清旧类再加新类
+		el.removeClass("bm-align-left", "bm-align-center", "bm-align-right");
+		el.addClass(`bm-align-${this.deps.getSettings().imageAlign}`);
+		this.clearOwn(el);
+
+		try {
+			// 解析链：图上 bm-style 指令 > 全局默认样式 > 内置兜底
+			const normalized = this.deps.normalizer.normalize(source);
+			const settings = this.deps.getSettings();
+			const style = this.deps.registry.get(normalized.styleId ?? settings.defaultStyleId)
+				?? this.deps.registry.getFallback();
+			const theme = this.deps.themeResolver.resolve(style);
+			const directive = normalized.directive;
+			const cacheKey = this.deps.normalizer.cacheKey(
+				normalized,
+				theme.id,
+				resolveLayout(directive, theme, this.deps.getSettings().layoutEngine).layout,
+			);
+
+			let svg = this.deps.cache.get(cacheKey);
+			if (svg === undefined) {
+				svg = await this.deps.engine.render(normalized.source, theme, directive);
+				this.deps.cache.put(cacheKey, svg);
+			}
+
+			const svgEl = this.deps.postProcessor.enhance(el, svg);
+			if (svgEl) this.deps.interaction.attach(el, svgEl);
+			this.verifyOwnership(el, source);
+		} catch (e) {
+			this.deps.errorBoundary.render(el, e, source);
+		}
+	}
+
+	/**
+	 * 与内置 mermaid 渲染器的竞态仲裁：内置渲染器可能在本插件之后往同一代码块
+	 * 写入原生 SVG（后写者胜），导致样式切换时部分图"不受控"。
+	 * 渲染完成后延时验证：若我们的产物被覆盖（无 wrap 却有 svg），夺回一次。
+	 * dataset 标记保证每容器最多夺回一次，避免乒乓。
+	 */
+	private verifyOwnership(el: HTMLElement, source: string): void {
+		if (el.dataset.bmRetake === "1") return;
+		window.setTimeout(() => {
+			if (!el.isConnected) return;
+			if (el.querySelector(".best-mermaid-wrap")) return; // 仍是我们的
+			if (!el.querySelector("svg")) return; // 没人画，无需仲裁
+			el.dataset.bmRetake = "1";
+			void this.render(source, el);
+		}, 1500);
+	}
+
+	/**
+	 * 容器是共享宿主（角标、Mermaid Exporter 等其他插件都会注入节点），
+	 * 重渲染只清自己的节点，外部注入的原样保留——
+	 * 其他插件对同一容器通常有"只注入一次"守卫，清掉了它们不会补回来。
+	 */
+	private clearOwn(el: HTMLElement): void {
+		const own = ["best-mermaid-wrap", "best-mermaid-badge", "best-mermaid-error"];
+		for (const child of Array.from(el.children)) {
+			if (own.some((cls) => child.hasClass(cls))) child.remove();
+		}
+	}
+}

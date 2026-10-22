@@ -1,0 +1,31 @@
+{
+	"name": "obsidian-best-mermaid",
+	"version": "0.1.0",
+	"description": "接管 mermaid 渲染：主题融合、缩放平移、导出 SVG/PNG、错误可视化。",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"test": "vitest run"
+	},
+	"keywords": [
+		"obsidian",
+		"mermaid",
+		"plugin"
+	],
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^20.14.0",
+		"builtin-modules": "^4.0.0",
+		"esbuild": "^0.21.5",
+		"jsdom": "^29.1.1",
+		"mermaid": "^11.4.0",
+		"obsidian": "latest",
+		"typescript": "^5.5.0",
+		"vite": "^8.3.4",
+		"vitest": "^5.0.5"
+	},
+	"dependencies": {
+		"@mermaid-js/layout-elk": "^1.0.1"
+	}
+}

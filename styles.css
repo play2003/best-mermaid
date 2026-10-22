@@ -1,0 +1,150 @@
+/* 容器与交互样式（SVG 内部样式由 ThemeResolver 通过 themeCSS 注入） */
+
+.best-mermaid-container {
+	position: relative;
+	overflow: hidden;
+	border-radius: 6px;
+}
+
+/* 水平对齐只作用于 svg 的包装层，不影响容器内其他子节点（角标、其他插件按钮） */
+.best-mermaid-wrap {
+	display: flex;
+	justify-content: flex-start; /* 默认左对齐 */
+}
+
+.best-mermaid-container.bm-align-center .best-mermaid-wrap {
+	justify-content: center;
+}
+
+.best-mermaid-container.bm-align-right .best-mermaid-wrap {
+	justify-content: flex-end;
+}
+
+/* 右上角来源角标：极小、低对比，悬停才清晰 */
+.best-mermaid-badge {
+	position: absolute;
+	top: 3px;
+	right: 6px;
+	font-size: 9px;
+	line-height: 1;
+	letter-spacing: 0.02em;
+	color: var(--text-faint);
+	opacity: 0.35;
+	pointer-events: none;
+	user-select: none;
+}
+
+.best-mermaid-container:hover .best-mermaid-badge {
+	opacity: 0.85;
+}
+
+.best-mermaid-container svg {
+	max-width: 100%;
+	height: auto;
+	transform-origin: 0 0;
+	transition: transform 0.08s ease-out;
+}
+
+/* 设置页 · 样式画廊 */
+.bm-style-section {
+	border-top: 1px solid var(--background-modifier-border);
+	margin-top: 16px;
+	padding-top: 8px;
+}
+
+.bm-style-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+	gap: 10px;
+	margin: 8px 0 16px;
+}
+
+.bm-style-card {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	padding: 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.bm-style-card.is-current {
+	border-color: var(--interactive-accent);
+}
+
+.bm-style-swatches {
+	display: flex;
+	gap: 4px;
+}
+
+.bm-style-swatch {
+	width: 22px;
+	height: 22px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.bm-swatch-dynamic {
+	background: linear-gradient(135deg, var(--interactive-accent), var(--background-primary));
+}
+
+.bm-style-title {
+	font-weight: 600;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.bm-style-current {
+	font-size: 10px;
+	color: var(--text-on-accent);
+	background: var(--interactive-accent);
+	border-radius: 4px;
+	padding: 1px 6px;
+	font-weight: 400;
+}
+
+.bm-style-desc {
+	font-size: 12px;
+	color: var(--text-muted);
+	min-height: 2em;
+}
+
+.bm-style-mode {
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
+.bm-style-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: auto;
+}
+
+/* 阅读视图：给 mermaid 块的第三方操作按钮（edit-block-button，如 Mermaid Exporter 的导出按钮）
+   补上与编辑视图一致的绝对定位——内核只对 .cm-embed-block（编辑视图）定义了它，
+   阅读视图下按钮会掉回文档流停在左下角。水平偏移由按钮所属插件自己设置 */
+.block-language-mermaid .edit-block-button {
+	position: absolute;
+	top: var(--size-2-2);
+}
+
+/* 错误可视化 */
+.best-mermaid-error {
+	border: 1px solid var(--background-modifier-error);
+	background: var(--background-secondary);
+	border-radius: 6px;
+	padding: 8px 12px;
+	font-size: 0.85em;
+	color: var(--text-error);
+}
+
+.best-mermaid-error .bm-error-msg {
+	font-weight: 600;
+	margin-bottom: 4px;
+}
+
+.best-mermaid-error pre {
+	margin: 4px 0 0;
+	color: var(--text-muted);
+}
