@@ -159,6 +159,18 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		expect(el.querySelector(".best-mermaid-wrap")).toBeTruthy();
 	});
 
+	it("渲染产物不含 foreignObject（回归：canvas 污染导致 toBlob 导出失败）", async () => {
+		const { deps } = makeDeps();
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		processor.handle("flowchart TB\n    A[开始<br/>第二行] --> B{判断}\n    B -->|是| C[结果]", el, {} as never);
+		await sleep(300);
+
+		expect(el.innerHTML).not.toContain("foreignObject");
+	});
+
 	it("导出按钮：预览区右下角、点击打开导出对话框（文件名/背景）", async () => {
 		const fake = new FakeExportDialog();
 		const { deps } = makeDeps({ defaultStyleId: "midnight" }, { openExportDialog: fake.open });

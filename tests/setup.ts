@@ -46,12 +46,18 @@ if (proto && !proto.addClass) {
 	};
 }
 
-// jsdom 没有 SVG 元素布局测量，mermaid 渲染依赖 getBBox
+// jsdom 没有 SVG 元素布局测量，mermaid 渲染依赖 getBBox 与文本测宽
 for (const name of ["SVGGElement", "SVGTextElement", "SVGGraphicsElement", "SVGElement"]) {
 	const Ctor = (globalThis as any)[name];
-	if (Ctor && !Ctor.prototype.getBBox) {
+	if (!Ctor) continue;
+	if (!Ctor.prototype.getBBox) {
 		Ctor.prototype.getBBox = function () {
 			return { x: 0, y: 0, width: 120, height: 40 };
+		};
+	}
+	if (!Ctor.prototype.getComputedTextLength) {
+		Ctor.prototype.getComputedTextLength = function () {
+			return (this.textContent ?? "").length * 8;
 		};
 	}
 }

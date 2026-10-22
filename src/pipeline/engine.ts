@@ -64,6 +64,10 @@ export class RenderEngine {
 		const config: Record<string, unknown> = {
 			startOnLoad: false,
 			securityLevel: "strict",
+			// 纯 SVG 文本标签：mermaid 默认 htmlLabels 会产生 <foreignObject>，
+			// Chromium 对含 foreignObject 的 SVG 图片光栅化会污染 canvas，
+			// 导致导出 PNG 时 toBlob 抛安全异常。关闭后预览与导出同源、且 SVG 合法
+			htmlLabels: false,
 			// 样式卡的布局基线（curve/间距等），优先级低于图内指令
 			...theme.diagramConfig,
 			theme: theme.baseTheme,
