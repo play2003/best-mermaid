@@ -12,6 +12,47 @@
 	justify-content: flex-start; /* 默认左对齐 */
 }
 
+/* 收缩层：让右下角按钮锚定"图"的实际边界，而不是整行容器右端 */
+.best-mermaid-figure {
+	position: relative;
+	display: flex;
+	max-width: 100%;
+	min-width: 0;
+}
+
+/* 右下角导出按钮：常驻低存在感，悬停图表/按钮时提亮 */
+.best-mermaid-export {
+	position: absolute;
+	right: 4px;
+	bottom: 4px;
+	margin: 0;
+	padding: 1px 5px;
+	font-family: inherit;
+	font-size: 9px;
+	line-height: 1.4;
+	letter-spacing: 0.02em;
+	color: var(--text-faint);
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	box-shadow: none;
+	opacity: 0.35;
+	cursor: pointer;
+	transition: opacity 0.12s ease;
+}
+
+.best-mermaid-container:hover .best-mermaid-export,
+.best-mermaid-export:hover,
+.best-mermaid-export:focus-visible {
+	opacity: 0.9;
+	color: var(--text-normal);
+}
+
+.best-mermaid-export:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
 .best-mermaid-container.bm-align-center .best-mermaid-wrap {
 	justify-content: center;
 }

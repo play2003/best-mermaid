@@ -6,7 +6,7 @@ import { RenderCache } from "../src/services/cache";
 import { follow } from "../src/styles/builtin/follow";
 import { midnight } from "../src/styles/builtin/midnight";
 import { resolveLayout } from "../src/pipeline/layout";
-import { GRAPH, makeDeps, sleep } from "./pipeline.test-utils";
+import { FakeExporter, GRAPH, makeDeps, sleep } from "./pipeline.test-utils";
 
 describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 	it("离屏分离树：connected=false 的容器也要渲染（回归：启动全灭）", async () => {
@@ -157,6 +157,62 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 
 		// 守卫应已触发重渲染，我方 wrap 恢复
 		expect(el.querySelector(".best-mermaid-wrap")).toBeTruthy();
+	});
+
+	it("导出按钮：图右下角、点击调用导出器（文件名/背景）", async () => {
+		const fake = new FakeExporter();
+		const { deps } = makeDeps({ defaultStyleId: "midnight" }, { exporter: fake });
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		processor.handle(GRAPH, el, { sourcePath: "Notes/架构 笔记.md" } as never);
+		await sleep(300);
+
+		const btn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
+		expect(btn).toBeTruthy();
+		// 按钮在 figure 层内（贴图的右下角而不是整行右端）
+		expect(btn!.parentElement?.hasClass("best-mermaid-figure")).toBe(true);
+		expect(btn!.parentElement?.parentElement?.hasClass("best-mermaid-wrap")).toBe(true);
+		expect(btn!.type).toBe("button");
+
+		btn!.click();
+		await sleep(0);
+
+		expect(fake.calls).toHaveLength(1);
+		expect(fake.calls[0].options).toMatchObject({
+			filename: "架构 笔记-1",
+			background: "#0f172a",
+			scale: 2,
+		});
+		expect(fake.calls[0].svg.tagName.toLowerCase()).toBe("svg");
+	});
+
+	it("导出文件名：同笔记第二张图序号递增，重渲染后保持稳定且按钮唯一", async () => {
+		const fake = new FakeExporter();
+		const { deps, settings } = makeDeps({ defaultStyleId: "midnight" }, { exporter: fake });
+		const processor = new MermaidBlockProcessor(deps);
+
+		const el1 = document.createElement("div");
+		const el2 = document.createElement("div");
+		document.body.append(el1, el2);
+		processor.handle(GRAPH, el1, { sourcePath: "Notes/a.md" } as never);
+		processor.handle(GRAPH, el2, { sourcePath: "Notes/a.md" } as never);
+		await sleep(300);
+
+		el1.querySelector<HTMLButtonElement>(".best-mermaid-export")!.click();
+		el2.querySelector<HTMLButtonElement>(".best-mermaid-export")!.click();
+		await sleep(0);
+		expect(fake.calls.map((c) => c.options?.filename)).toEqual(["a-1", "a-2"]);
+
+		// 重渲染：按钮唯一且编号不变
+		settings.defaultStyleId = "paper";
+		processor.rerenderAll();
+		await sleep(800);
+		expect(el1.querySelectorAll(".best-mermaid-export")).toHaveLength(1);
+		el1.querySelector<HTMLButtonElement>(".best-mermaid-export")!.click();
+		await sleep(0);
+		expect(fake.calls.at(-1)?.options?.filename).toBe("a-1");
 	});
 
 	it("bm-style 图级指令覆盖全局默认样式", async () => {

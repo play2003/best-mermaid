@@ -46,6 +46,7 @@ export default class BestMermaidPlugin extends Plugin {
 			postProcessor: new PostProcessor(),
 			errorBoundary: new ErrorBoundary(),
 			interaction: new InteractionService(() => this.settings.zoomEnabled),
+			exporter: new ExportService(),
 		};
 		this.processor = new MermaidBlockProcessor(deps);
 		this.processor.startWatch();

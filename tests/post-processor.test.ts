@@ -26,4 +26,25 @@ describe("PostProcessor SVG 解析", () => {
 		const pp = new PostProcessor();
 		expect(() => pp.enhance(el, "definitely not svg <<<")).toThrow();
 	});
+
+	it("提供导出回调时创建按钮，点击回调收到 svg", () => {
+		const el = document.createElement("div");
+		const pp = new PostProcessor();
+		let exported: SVGSVGElement | null = null;
+		const svg = pp.enhance(el, '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>', (s) => {
+			exported = s;
+		});
+		const btn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
+		expect(btn).toBeTruthy();
+		expect(btn!.title).toBe("Export PNG"); // 默认 en locale
+		btn!.click();
+		expect(exported).toBe(svg);
+	});
+
+	it("不提供回调时不创建按钮", () => {
+		const el = document.createElement("div");
+		const pp = new PostProcessor();
+		pp.enhance(el, '<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>');
+		expect(el.querySelector(".best-mermaid-export")).toBeNull();
+	});
 });

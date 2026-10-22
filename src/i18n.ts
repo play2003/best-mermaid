@@ -29,6 +29,7 @@ const en: Dict = {
 	fixedPalette: "Fixed palette",
 	renderFailed: "Mermaid render failed",
 	nearLine: "(near line",
+	exportPng: "Export PNG",
 };
 
 const zh: Dict = {
@@ -54,6 +55,7 @@ const zh: Dict = {
 	fixedPalette: "固定配色",
 	renderFailed: "Mermaid 渲染失败",
 	nearLine: "（疑似第",
+	exportPng: "导出 PNG",
 };
 
 export function t(key: string): string {

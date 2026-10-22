@@ -24,4 +24,10 @@ describe("i18n 跟随 Obsidian 语言设置", () => {
 		setLocale("en");
 		expect(t("__nope__")).toBe("__nope__");
 	});
+	it("导出按钮文案", () => {
+		setLocale("en");
+		expect(t("exportPng")).toBe("Export PNG");
+		setLocale("zh-cn");
+		expect(t("exportPng")).toBe("导出 PNG");
+	});
 });

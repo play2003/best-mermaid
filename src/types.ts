@@ -28,6 +28,21 @@ export interface NormalizedSource {
 	styleId: string | null;
 }
 
+/** PNG 导出选项 */
+export interface PngExportOptions {
+	/** 不含扩展名的基础文件名，如 "架构笔记-2" */
+	filename?: string;
+	/** canvas 底色，通常是 themeVariables.background */
+	background?: string;
+	/** 光栅化倍率，默认 2 */
+	scale?: number;
+}
+
+/** 导出器窄接口：processor 依赖此接口，便于测试注入 Fake */
+export interface PngExporter {
+	exportPng(svg: SVGSVGElement, options?: PngExportOptions): Promise<void>;
+}
+
 /** 渲染管线各阶段共享的依赖注入容器 */
 export interface PipelineDeps {
 	getSettings: () => import("./settings").BestMermaidSettings;
@@ -39,4 +54,5 @@ export interface PipelineDeps {
 	postProcessor: import("./pipeline/post-processor").PostProcessor;
 	errorBoundary: import("./services/error-boundary").ErrorBoundary;
 	interaction: import("./services/interaction").InteractionService;
+	exporter: PngExporter;
 }

@@ -1,6 +1,7 @@
 import type { MarkdownPostProcessorContext } from "obsidian";
-import type { PipelineDeps } from "../types";
+import type { PipelineDeps, ThemeProfile } from "../types";
 import { resolveLayout } from "./layout";
+import { buildPngFilename } from "../services/export";
 
 /**
  * 代码块处理器：渲染管线的调度入口。
@@ -10,6 +11,8 @@ export class MermaidBlockProcessor {
 	private timers = new WeakMap<HTMLElement, number>();
 	/** 每容器渲染序号：仅最新一轮可落笔，防止并发渲染双写 */
 	private seq = new WeakMap<HTMLElement, number>();
+	/** 每笔记的图序号计数器（导出文件名用） */
+	private figureCounters = new Map<string, number>();
 	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
 	private version = 0;
 	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
@@ -46,9 +49,22 @@ export class MermaidBlockProcessor {
 		this.observer = null;
 		for (const guard of this.guards.values()) guard.disconnect();
 		this.guards.clear();
+		this.figureCounters.clear();
 	}
 
-	handle = (source: string, el: HTMLElement, _ctx: MarkdownPostProcessorContext): void => {
+	handle = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext): void => {
+		// 记录来源笔记与图序号（导出文件名 = 笔记名 + 序号）；dataset 随容器克隆保留
+		const sourcePath = ctx.sourcePath ?? "";
+		if (el.dataset.bmSourcePath !== sourcePath) {
+			el.dataset.bmSourcePath = sourcePath;
+			delete el.dataset.bmFigureIndex;
+		}
+		if (!el.dataset.bmFigureIndex) {
+			const next = (this.figureCounters.get(sourcePath) ?? 0) + 1;
+			this.figureCounters.set(sourcePath, next);
+			el.dataset.bmFigureIndex = String(next);
+		}
+
 		const prev = this.timers.get(el);
 		if (prev !== undefined) window.clearTimeout(prev);
 
@@ -114,7 +130,15 @@ export class MermaidBlockProcessor {
 			// await 期间可能有更新一轮的渲染已启动：本轮过期，放弃落笔
 			if (this.seq.get(el) !== seq) return;
 
-			const svgEl = this.deps.postProcessor.enhance(el, svg);
+			const filename = buildPngFilename(
+				el.dataset.bmSourcePath ?? "",
+				el.dataset.bmFigureIndex ?? "1",
+			);
+			const background = this.exportBackground(theme, directive);
+
+			const svgEl = this.deps.postProcessor.enhance(el, svg, (target) =>
+				this.deps.exporter.exportPng(target, { filename, background, scale: 2 }),
+			);
 			if (svgEl) this.deps.interaction.attach(el, svgEl);
 			this.attachGuard(el, source);
 		} catch (e) {
@@ -144,6 +168,21 @@ export class MermaidBlockProcessor {
 		});
 		guard.observe(el, { childList: true });
 		this.guards.set(el, guard);
+	}
+
+	/**
+	 * 导出 PNG 的底色：与渲染优先级一致——图内 init 指令 > 样式卡解析结果 > 页面背景 > 白。
+	 */
+	private exportBackground(theme: ThemeProfile, directive: Record<string, unknown> | null): string {
+		const dv = directive?.themeVariables;
+		if (dv && typeof dv === "object" && !Array.isArray(dv)) {
+			const v = (dv as Record<string, unknown>).background;
+			if (typeof v === "string" && v.trim()) return v;
+		}
+		const bg = theme.themeVariables.background;
+		if (typeof bg === "string" && bg.trim()) return bg;
+		const bodyBg = getComputedStyle(document.body).backgroundColor;
+		return bodyBg && bodyBg !== "rgba(0, 0, 0, 0)" && bodyBg !== "transparent" ? bodyBg : "#ffffff";
 	}
 
 	/**

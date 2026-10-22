@@ -8,6 +8,8 @@
  */
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 8;
+/** 容器内覆盖按钮（导出等）：不参与缩放/拖拽/双击手势 */
+const OVERLAY_SELECTOR = ".best-mermaid-export";
 /** 指数缩放步进：任意倍率下手感一致 */
 const ZOOM_STEP = 1.1;
 /** 位移超过该值才算拖拽（像素），阈值内松手视为点击 */
@@ -66,7 +68,11 @@ export class InteractionService {
 			}
 		};
 
+		const isOverlayTarget = (target: EventTarget | null): boolean =>
+			target instanceof Element && target.closest(OVERLAY_SELECTOR) !== null;
+
 		const onWheel = (ev: WheelEvent) => {
+			if (isOverlayTarget(ev.target)) return;
 			if (!ev.ctrlKey) return; // 不拦截普通滚动
 			ev.preventDefault();
 			window.clearTimeout(snapTimer);
@@ -75,6 +81,7 @@ export class InteractionService {
 		};
 
 		const onDown = (ev: PointerEvent) => {
+			if (isOverlayTarget(ev.target)) return;
 			if (ev.button !== 0 || state.scale <= 1) return; // 未放大时不抢占，文本可选中
 			downX = ev.clientX;
 			downY = ev.clientY;
@@ -110,6 +117,7 @@ export class InteractionService {
 		};
 
 		const onDblClick = (ev: MouseEvent) => {
+			if (isOverlayTarget(ev.target)) return;
 			if (state.scale === 1 && state.tx === 0 && state.ty === 0) return;
 			ev.preventDefault();
 			state.scale = 1;

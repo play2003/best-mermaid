@@ -1,6 +1,7 @@
 import { RenderCache } from "../src/services/cache";
 import { ErrorBoundary } from "../src/services/error-boundary";
 import { InteractionService } from "../src/services/interaction";
+import { ExportService } from "../src/services/export";
 import { SourceNormalizer } from "../src/pipeline/normalizer";
 import { ThemeResolver } from "../src/pipeline/theme-resolver";
 import { RenderEngine } from "../src/pipeline/engine";
@@ -11,12 +12,24 @@ import { midnight } from "../src/styles/builtin/midnight";
 import { paper } from "../src/styles/builtin/paper";
 import { terra } from "../src/styles/builtin/terra";
 import type { BestMermaidSettings } from "../src/settings";
+import type { PipelineDeps, PngExportOptions, PngExporter } from "../src/types";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export const GRAPH = "flowchart LR\n    A[Start] --> B[End]";
 
-export function makeDeps(overrides: Partial<BestMermaidSettings> = {}) {
+/** 测试用导出器：只记录调用，不触达 canvas */
+export class FakeExporter implements PngExporter {
+	calls: Array<{ svg: SVGSVGElement; options: PngExportOptions | undefined }> = [];
+	async exportPng(svg: SVGSVGElement, options?: PngExportOptions): Promise<void> {
+		this.calls.push({ svg, options });
+	}
+}
+
+export function makeDeps(
+	overrides: Partial<BestMermaidSettings> = {},
+	extraDeps: Partial<PipelineDeps> = {},
+) {
 	const settings: BestMermaidSettings = {
 		debounceMs: 0,
 		zoomEnabled: false,
@@ -39,6 +52,8 @@ export function makeDeps(overrides: Partial<BestMermaidSettings> = {}) {
 		postProcessor: new PostProcessor(),
 		errorBoundary: new ErrorBoundary(),
 		interaction: new InteractionService(() => settings.zoomEnabled),
+		exporter: new ExportService(),
+		...extraDeps,
 	};
 	return { deps, settings };
 }
