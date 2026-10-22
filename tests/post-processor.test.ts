@@ -37,6 +37,7 @@ describe("PostProcessor SVG 解析", () => {
 		const btn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
 		expect(btn).toBeTruthy();
 		expect(btn!.title).toBe("Export PNG"); // 默认 en locale
+		expect(btn!.dataset.icon).toBe("download"); // setIcon 桩记录
 		btn!.click();
 		expect(exported).toBe(svg);
 	});

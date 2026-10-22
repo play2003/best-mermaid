@@ -2,6 +2,7 @@
  * SVG 后处理：把 mermaid 输出的 SVG 字符串写成容器内 DOM，
  * 并做尺寸/交互所需的增强。路径几何完全交给布局引擎（elk/dagre），不做二次加工。
  */
+import { setIcon } from "obsidian";
 import { t } from "../i18n";
 
 /** 导出回调：拿到真实 svg 元素执行导出 */
@@ -41,13 +42,14 @@ export class PostProcessor {
 		return svg;
 	}
 
-	/** 图的右下角导出按钮（挂在容器上，位置由 processor 按 svg 渲染框计算） */
+	/** 预览区块右下角的导出按钮（容器级绝对定位，CSS 锚定） */
 	private attachExportButton(el: HTMLElement, svg: SVGSVGElement, onExport: ExportHandler): void {
 		const label = t("exportPng");
-		const btn = el.createEl("button", { cls: "best-mermaid-export", text: "PNG" });
+		const btn = el.createEl("button", { cls: "best-mermaid-export" });
 		btn.type = "button";
 		btn.title = label;
 		btn.setAttribute("aria-label", label);
+		setIcon(btn, "download");
 		btn.addEventListener("click", async (ev) => {
 			ev.stopPropagation();
 			if (btn.disabled) return;

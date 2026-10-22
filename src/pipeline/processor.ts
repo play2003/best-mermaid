@@ -13,8 +13,6 @@ export class MermaidBlockProcessor {
 	private seq = new WeakMap<HTMLElement, number>();
 	/** 每笔记的图序号计数器（导出文件名用） */
 	private figureCounters = new Map<string, number>();
-	/** 导出按钮的尺寸跟随观察器（每容器一个） */
-	private buttonObservers = new Map<HTMLElement, ResizeObserver>();
 	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
 	private version = 0;
 	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
@@ -51,8 +49,6 @@ export class MermaidBlockProcessor {
 		this.observer = null;
 		for (const guard of this.guards.values()) guard.disconnect();
 		this.guards.clear();
-		for (const ro of this.buttonObservers.values()) ro.disconnect();
-		this.buttonObservers.clear();
 		this.figureCounters.clear();
 	}
 
@@ -143,11 +139,7 @@ export class MermaidBlockProcessor {
 			const svgEl = this.deps.postProcessor.enhance(el, svg, (target) =>
 				this.deps.exporter.exportPng(target, { filename, background, scale: 2 }),
 			);
-			if (svgEl) {
-				this.deps.interaction.attach(el, svgEl);
-				const btn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
-				if (btn) this.glueExportButton(el, svgEl, btn);
-			}
+			if (svgEl) this.deps.interaction.attach(el, svgEl);
 			this.attachGuard(el, source);
 		} catch (e) {
 			this.deps.errorBoundary.render(el, e, source);
@@ -176,41 +168,6 @@ export class MermaidBlockProcessor {
 		});
 		guard.observe(el, { childList: true });
 		this.guards.set(el, guard);
-	}
-
-	/**
-	 * 导出按钮定位在图的右下角（内缩 4px）：
-	 * - rAF 首帧定位（此时布局已完成）
-	 * - 容器尺寸变化（窗口 resize/对齐切换）由 ResizeObserver 重新贴合图边缘
-	 * - 缩放/拖拽时不跟随（按钮位置保持稳定）
-	 * 按钮是容器的绝对定位子节点，不参与文档流，零布局影响。
-	 */
-	private glueExportButton(el: HTMLElement, svg: SVGSVGElement, btn: HTMLButtonElement): void {
-		const place = () => {
-			if (!el.isConnected) return;
-			// getBoundingClientRect 含缩放/平移变换；用 dataset 中记录的变换状态反算
-			// svg 的"布局框"，让按钮锚定在图的原始右下角（缩放/拖拽时按钮不移动）
-			const scale = Number(el.dataset.bmScale) || 1;
-			const tx = Number(el.dataset.bmTx) || 0;
-			const ty = Number(el.dataset.bmTy) || 0;
-			const cr = el.getBoundingClientRect();
-			const sr = svg.getBoundingClientRect();
-			const layoutLeft = sr.left - cr.left - tx;
-			const layoutTop = sr.top - cr.top - ty;
-			const layoutWidth = sr.width / (scale || 1);
-			const layoutHeight = sr.height / (scale || 1);
-			btn.style.left = `${Math.max(0, layoutLeft + layoutWidth - btn.offsetWidth - 4)}px`;
-			btn.style.top = `${Math.max(0, layoutTop + layoutHeight - btn.offsetHeight - 4)}px`;
-		};
-
-		requestAnimationFrame(place);
-
-		this.buttonObservers.get(el)?.disconnect();
-		if (typeof ResizeObserver !== "undefined") {
-			const ro = new ResizeObserver(place);
-			ro.observe(el);
-			this.buttonObservers.set(el, ro);
-		}
 	}
 
 	/**
