@@ -7,8 +7,11 @@ import type { StyleCard } from "../types";
  */
 export const follow: StyleCard = {
 	id: "follow",
-	name: "跟随主题",
-	description: "从 Obsidian 当前主题的 CSS 变量解析配色，随亮/暗自动切换",
+	name: "Follow theme",
+	description: "Colors resolved from the Obsidian theme's CSS variables; follows light/dark automatically",
+	translations: {
+		zh: { name: "跟随主题", description: "从 Obsidian 当前主题的 CSS 变量解析配色，随亮/暗自动切换" },
+	},
 	swatches: [],
 	mode: "dynamic",
 	config: {

@@ -8,8 +8,11 @@ import type { StyleCard } from "../types";
  */
 export const paper: StyleCard = {
 	id: "paper",
-	name: "论文黑白",
-	description: "印刷风格：近直角节点、细线深灰，适合导出与打印",
+	name: "Paper",
+	description: "Print style: near-square nodes, thin dark-grey lines and orthogonal routing, ready for export and printing",
+	translations: {
+		zh: { name: "论文黑白", description: "印刷风格：近直角节点、细线深灰，适合导出与打印" },
+	},
 	swatches: ["#ffffff", "#efefef", "#888888", "#111111"],
 	mode: "static",
 	config: {

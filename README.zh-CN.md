@@ -17,6 +17,14 @@
 
 *左：Obsidian 默认 mermaid 渲染。右：Best Mermaid 的论文黑白样式——贴合主题的灰阶配色与干净的正交布线。*
 
+![缩放效果](./images/zoom-effect.png)
+
+*`Ctrl` + 滚轮以光标为中心缩放（触控板捏合同样有效）；拖拽平移、双击复位——缩放状态在重渲染后保留。*
+
+![PNG 导出对话框](./images/export-dialog.png)
+
+*点击任意图右下角的下载图标：可编辑文件名、选择 1x–4x 图片质量，并通过系统保存对话框选择任意位置保存。*
+
 ## 为什么还要一个 mermaid 插件？
 
 已有的 mermaid 外观插件不少，Best Mermaid 的不同在于：

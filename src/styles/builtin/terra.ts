@@ -8,8 +8,11 @@ import type { StyleCard } from "../types";
  */
 export const terra: StyleCard = {
 	id: "terra",
-	name: "赤陶",
-	description: "暖调人文风：大圆角、柔和曲线、宽松间距，适合讲解与分享",
+	name: "Terracotta",
+	description: "Warm humanist palette: large radii, soft curves and generous spacing, great for teaching and sharing",
+	translations: {
+		zh: { name: "赤陶", description: "暖调人文风：大圆角、柔和曲线、宽松间距，适合讲解与分享" },
+	},
 	swatches: ["#faf5ec", "#f3e3c8", "#c2703d", "#3d2c1e"],
 	mode: "static",
 	config: {

@@ -8,8 +8,11 @@ import type { StyleCard } from "../types";
  */
 export const midnight: StyleCard = {
 	id: "midnight",
-	name: "靛夜",
-	description: "深色展示风：直线精确、靛蓝点睛，适合投影与截图",
+	name: "Midnight",
+	description: "Dark presentation look: precise straight lines and an indigo accent, made for slides and screenshots",
+	translations: {
+		zh: { name: "靛夜", description: "深色展示风：直线精确、靛蓝点睛，适合投影与截图" },
+	},
 	swatches: ["#0f172a", "#1e293b", "#818cf8", "#e2e8f0"],
 	mode: "static",
 	config: {

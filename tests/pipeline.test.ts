@@ -297,7 +297,7 @@ describe("单元：SourceNormalizer", () => {
 describe("单元：StyleRegistry", () => {
 	it("内置卡查询与兜底", () => {
 		const r = new StyleRegistry([follow, midnight]);
-		expect(r.get("midnight")?.name).toBe("靛夜");
+		expect(r.get("midnight")?.name).toBe("Midnight");
 		expect(r.isBuiltin("midnight")).toBe(true);
 		expect(r.isBuiltin("nope")).toBe(false);
 		expect(r.getFallback().id).toBe("follow");

@@ -1,7 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type BestMermaidPlugin from "./main";
 import type { StyleCard } from "./styles/types";
-import { t } from "./i18n";
+import { t, tStyle } from "./i18n";
 
 export interface BestMermaidSettings {
 	/** 输入时渲染防抖（毫秒） */
@@ -127,13 +127,14 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			for (let i = 0; i < 4; i++) swatches.createDiv({ cls: "bm-style-swatch bm-swatch-dynamic" });
 		}
 
+		const text = tStyle(style);
 		const title = card.createDiv({ cls: "bm-style-title" });
-		title.createSpan({ text: style.name });
+		title.createSpan({ text: text.name });
 		if (style.id === this.plugin.settings.defaultStyleId) {
 			title.createSpan({ cls: "bm-style-current", text: t("current") });
 		}
 
-		if (style.description) card.createDiv({ cls: "bm-style-desc", text: style.description });
+		if (text.description) card.createDiv({ cls: "bm-style-desc", text: text.description });
 		card.createDiv({
 			cls: "bm-style-mode",
 			text: style.mode === "dynamic" ? t("followsTheme") : t("fixedPalette"),

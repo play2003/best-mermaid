@@ -17,6 +17,14 @@ Install it, open a note, and it just looks right.
 
 *Left: the default Obsidian mermaid renderer. Right: Best Mermaid with the Paper style — theme-matched grayscale palette and clean orthogonal routing.*
 
+![Zoomed diagram with pan and zoom](./images/zoom-effect.png)
+
+*`Ctrl` + scroll zooms at the cursor (trackpad pinch works too); drag to pan; double-click to reset — zoom stays put across re-renders.*
+
+![PNG export dialog](./images/export-dialog.png)
+
+*Click the download icon at the bottom-right of any diagram: edit the file name, pick 1x–4x quality, and save anywhere through the native save dialog.*
+
 ## Why another mermaid plugin?
 
 There are several mermaid appearance plugins already. Best Mermaid differs in a few ways:

@@ -80,3 +80,17 @@ export function t(key: string): string {
 	const isZh = /^zh\b/i.test(moment.locale());
 	return (isZh ? zh[key] : en[key]) ?? en[key] ?? key;
 }
+
+/** 样式卡文案本地化：中文取 translations.zh，其余语言用卡片默认（英文）文案 */
+export function tStyle(style: {
+	name: string;
+	description?: string;
+	translations?: Record<string, { name: string; description?: string }>;
+}): { name: string; description?: string } {
+	const isZh = /^zh\b/i.test(moment.locale());
+	const tr = isZh ? style.translations?.zh : undefined;
+	return {
+		name: tr?.name ?? style.name,
+		description: tr?.description ?? style.description,
+	};
+}

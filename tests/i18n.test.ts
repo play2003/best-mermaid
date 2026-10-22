@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { t } from "../src/i18n";
+import { t, tStyle } from "../src/i18n";
 
 const setLocale = (v?: string) => {
 	(globalThis as unknown as { __BM_LOCALE__?: string }).__BM_LOCALE__ = v;
@@ -29,5 +29,19 @@ describe("i18n 跟随 Obsidian 语言设置", () => {
 		expect(t("exportPng")).toBe("Export PNG");
 		setLocale("zh-cn");
 		expect(t("exportPng")).toBe("导出 PNG");
+	});
+	it("样式卡文案随语言切换", () => {
+		const card = {
+			name: "Paper",
+			description: "Print style",
+			translations: { zh: { name: "论文黑白", description: "印刷风格" } },
+		};
+		setLocale("en");
+		expect(tStyle(card)).toEqual({ name: "Paper", description: "Print style" });
+		setLocale("zh-cn");
+		expect(tStyle(card)).toEqual({ name: "论文黑白", description: "印刷风格" });
+		// 无该语言翻译时回退默认文案
+		setLocale("zh");
+		expect(tStyle({ name: "Custom", description: "x" }).name).toBe("Custom");
 	});
 });
