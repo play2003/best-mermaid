@@ -83,6 +83,10 @@ describe("exportPng 完整管线（mock canvas/Image/URL）", () => {
 		const serialized = spySerialize.mock.results[0]?.value as string;
 		expect(serialized).toContain('id="bm-test"'); // 保留根 id（样式作用域）
 		expect(serialized).not.toContain("transform: scale(2)"); // 交互缩放被清除
+		// 克隆必须带明确的宽高（mermaid 原 svg 是 width=100%，独立图片会按回退尺寸裁切）
+		expect(serialized).toContain('width="100"');
+		expect(serialized).toContain('height="50"');
+		expect(serialized).not.toContain('width="100%"');
 
 		vi.unstubAllGlobals();
 	});

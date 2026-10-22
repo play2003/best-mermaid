@@ -103,6 +103,9 @@ export class ExportService implements PngExporter {
 	/**
 	 * 克隆并规整：测量用原始（活体）SVG；clone 上清除交互缩放/拉伸，
 	 * 保留根 id（mermaid 11 的 <style> 以 #<svgId> 作用域编译，删 id 会丢全部样式）。
+	 *
+	 * 必须给 clone 设定明确的 width/height：mermaid 的 svg 是 width="100%"，
+	 * 作为独立图片加载时没有确定固有尺寸，光栅化会按浏览器回退尺寸裁切（导出图不完整）。
 	 */
 	private prepareClone(svg: SVGSVGElement): { clone: SVGSVGElement; width: number; height: number } {
 		const { width, height } = this.measure(svg);
@@ -110,6 +113,8 @@ export class ExportService implements PngExporter {
 		clone.style.transform = "";
 		clone.style.transition = "";
 		clone.style.maxWidth = "none";
+		clone.setAttribute("width", String(Math.ceil(width)));
+		clone.setAttribute("height", String(Math.ceil(height)));
 		return { clone, width, height };
 	}
 
