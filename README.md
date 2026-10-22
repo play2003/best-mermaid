@@ -1,6 +1,15 @@
 # Best Mermaid
 
-Best Mermaid takes over mermaid code block rendering in Obsidian's reading view, with theme-aware styling, curated style packs, pan & zoom, and readable error messages — while staying fully offline.
+**Diagrams that feel like they belong in your notes.**
+
+Your notes have a theme. Your diagrams don't — the same purple boxes, mismatched fonts, and edges that cross like spaghetti. Best Mermaid re-renders every mermaid diagram in your vault with your theme's own colors, curated styles, and professional layout. No configuration. No new syntax.
+
+Install it, open a note, and it just looks right.
+
+- ✦ **Zero config** — your existing diagrams look better the moment the plugin loads
+- ✦ **Follows your theme** — light/dark, custom CSS, accent colors: diagrams dress accordingly
+- ✦ **Style packs** — one line switches a diagram to a print-ready or presentation look
+- ✦ **Stays offline** — mermaid and elk are bundled; nothing leaves your vault
 
 <!-- TODO: add screenshots before release (./images/screenshot-styles.png, ./images/screenshot-zoom.png) -->
 
