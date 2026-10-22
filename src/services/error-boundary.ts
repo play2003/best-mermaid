@@ -2,6 +2,8 @@
  * 错误边界：渲染失败时绝不静默空白，
  * 渲染出带错误信息与源码定位的可视错误块。
  */
+import { t } from "../i18n";
+
 export class ErrorBoundary {
 	render(el: HTMLElement, error: unknown, source: string): void {
 		const msg = error instanceof Error ? error.message : String(error);
@@ -10,7 +12,7 @@ export class ErrorBoundary {
 		const box = el.createDiv({ cls: "best-mermaid-error" });
 		box.createDiv({
 			cls: "bm-error-msg",
-			text: `Mermaid render failed${suspectLine ? ` (near line ${suspectLine})` : ""}`,
+			text: `${t("renderFailed")}${suspectLine ? ` ${t("nearLine")} ${suspectLine})` : ""}`,
 		});
 		box.createDiv({ cls: "bm-error-detail", text: msg });
 		if (suspectLine !== null) {

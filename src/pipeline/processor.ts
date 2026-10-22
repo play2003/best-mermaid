@@ -12,6 +12,8 @@ export class MermaidBlockProcessor {
 	private version = 0;
 	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
 	private observer: MutationObserver | null = null;
+	/** 每容器守卫：内置 mermaid 渲染器覆盖我方输出时立即夺回（事件驱动，无窗口期） */
+	private guards = new Map<HTMLElement, MutationObserver>();
 
 	constructor(private deps: PipelineDeps) {}
 
@@ -40,6 +42,8 @@ export class MermaidBlockProcessor {
 	stopWatch(): void {
 		this.observer?.disconnect();
 		this.observer = null;
+		for (const guard of this.guards.values()) guard.disconnect();
+		this.guards.clear();
 	}
 
 	handle = (source: string, el: HTMLElement, _ctx: MarkdownPostProcessorContext): void => {
@@ -102,27 +106,34 @@ export class MermaidBlockProcessor {
 
 			const svgEl = this.deps.postProcessor.enhance(el, svg);
 			if (svgEl) this.deps.interaction.attach(el, svgEl);
-			this.verifyOwnership(el, source);
+			this.attachGuard(el, source);
 		} catch (e) {
 			this.deps.errorBoundary.render(el, e, source);
 		}
 	}
 
 	/**
-	 * 与内置 mermaid 渲染器的竞态仲裁：内置渲染器可能在本插件之后往同一代码块
-	 * 写入原生 SVG（后写者胜），导致样式切换时部分图"不受控"。
-	 * 渲染完成后延时验证：若我们的产物被覆盖（无 wrap 却有 svg），夺回一次。
-	 * dataset 标记保证每容器最多夺回一次，避免乒乓。
+	 * 容器守卫（事件驱动的竞态仲裁）：
+	 * 内置 mermaid 渲染器与本插件会先后往同一代码块写入 SVG（后写者胜），
+	 * 它可能在我们渲染完成后很久才落笔（大文档/标签页重开）——
+	 * 定时窗口验证会漏，这里改为每容器常驻 MutationObserver：
+	 * 一旦发现容器里出现"无我方 wrap 的 SVG"（内置渲染器覆盖），立即重渲染夺回。
+	 * 自身的渲染写入会触发本观察器但条件不成立，天然无循环。
 	 */
-	private verifyOwnership(el: HTMLElement, source: string): void {
-		if (el.dataset.bmRetake === "1") return;
-		window.setTimeout(() => {
-			if (!el.isConnected) return;
-			if (el.querySelector(".best-mermaid-wrap")) return; // 仍是我们的
-			if (!el.querySelector("svg")) return; // 没人画，无需仲裁
-			el.dataset.bmRetake = "1";
-			void this.render(source, el);
-		}, 1500);
+	private attachGuard(el: HTMLElement, source: string): void {
+		this.guards.get(el)?.disconnect();
+		const guard = new MutationObserver(() => {
+			if (!el.isConnected) {
+				guard.disconnect();
+				this.guards.delete(el);
+				return;
+			}
+			if (!el.querySelector(".best-mermaid-wrap") && el.querySelector("svg")) {
+				void this.render(source, el);
+			}
+		});
+		guard.observe(el, { childList: true });
+		this.guards.set(el, guard);
 	}
 
 	/**

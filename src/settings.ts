@@ -1,6 +1,7 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import type BestMermaidPlugin from "./main";
 import type { StyleCard } from "./styles/types";
+import { t } from "./i18n";
 
 export interface BestMermaidSettings {
 	/** 输入时渲染防抖（毫秒） */
@@ -47,14 +48,14 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		this.renderStyleGallery();
 
 		new Setting(containerEl)
-			.setName("Layout engine")
-			.setDesc("elk provides professional orthogonal edge routing (loaded on demand)")
+			.setName(t("layoutEngine"))
+			.setDesc(t("layoutEngineDesc"))
 			.addDropdown((d) =>
 				d
 					.addOptions({
-						auto: "Auto (follow style)",
-						dagre: "dagre (default)",
-						elk: "elk (experimental)",
+						auto: t("engineAuto"),
+						dagre: t("engineDagre"),
+						elk: t("engineElk"),
 					})
 					.setValue(this.plugin.settings.layoutEngine)
 					.onChange(async (v) => {
@@ -65,11 +66,11 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Horizontal alignment")
-			.setDesc("Horizontal position of rendered diagrams")
+			.setName(t("horizontalAlignment"))
+			.setDesc(t("horizontalAlignmentDesc"))
 			.addDropdown((d) =>
 				d
-					.addOptions({ left: "Left", center: "Center", right: "Right" })
+					.addOptions({ left: t("alignLeft"), center: t("alignCenter"), right: t("alignRight") })
 					.setValue(this.plugin.settings.imageAlign)
 					.onChange(async (v) => {
 						this.plugin.settings.imageAlign = v as BestMermaidSettings["imageAlign"];
@@ -79,10 +80,10 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Render debounce")
-			.setDesc("Delay in milliseconds before re-rendering while typing")
-			.addText((t) =>
-				t.setValue(String(this.plugin.settings.debounceMs)).onChange(async (v) => {
+			.setName(t("renderDebounce"))
+			.setDesc(t("renderDebounceDesc"))
+			.addText((t2) =>
+				t2.setValue(String(this.plugin.settings.debounceMs)).onChange(async (v) => {
 					const n = Number(v);
 					if (Number.isFinite(n) && n >= 0) {
 						this.plugin.settings.debounceMs = n;
@@ -92,9 +93,9 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
-			.setName("Enable zoom and pan")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.zoomEnabled).onChange(async (v) => {
+			.setName(t("enableZoom"))
+			.addToggle((t2) =>
+				t2.setValue(this.plugin.settings.zoomEnabled).onChange(async (v) => {
 					this.plugin.settings.zoomEnabled = v;
 					await this.plugin.saveSettings();
 				}),
@@ -104,9 +105,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作） */
 	private renderStyleGallery(): void {
 		const section = this.containerEl.createDiv({ cls: "bm-style-section" });
-		new Setting(section)
-			.setName("Styles")
-			.setDesc("Default style for diagrams. Override per diagram with %% bm-style: <id> %%");
+		new Setting(section).setName(t("styles")).setDesc(t("stylesDesc"));
 
 		const grid = section.createDiv({ cls: "bm-style-grid" });
 		for (const style of this.plugin.registry.list()) {
@@ -131,18 +130,18 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		const title = card.createDiv({ cls: "bm-style-title" });
 		title.createSpan({ text: style.name });
 		if (style.id === this.plugin.settings.defaultStyleId) {
-			title.createSpan({ cls: "bm-style-current", text: "Current" });
+			title.createSpan({ cls: "bm-style-current", text: t("current") });
 		}
 
 		if (style.description) card.createDiv({ cls: "bm-style-desc", text: style.description });
 		card.createDiv({
 			cls: "bm-style-mode",
-			text: style.mode === "dynamic" ? "Follows theme" : "Fixed palette",
+			text: style.mode === "dynamic" ? t("followsTheme") : t("fixedPalette"),
 		});
 
 		const actions = card.createDiv({ cls: "bm-style-actions" });
 		if (style.id !== this.plugin.settings.defaultStyleId) {
-			actions.createEl("button", { text: "Set as default" }).addEventListener("click", async () => {
+			actions.createEl("button", { text: t("setAsDefault") }).addEventListener("click", async () => {
 				this.plugin.settings.defaultStyleId = style.id;
 				await this.plugin.saveSettings();
 				this.plugin.onStyleChange();
@@ -150,7 +149,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			});
 		}
 		if (!this.plugin.registry.isBuiltin(style.id)) {
-			actions.createEl("button", { text: "Delete" }).addEventListener("click", () => {
+			actions.createEl("button", { text: t("delete") }).addEventListener("click", () => {
 				this.plugin.registry.deleteUser(style.id);
 				this.display();
 			});

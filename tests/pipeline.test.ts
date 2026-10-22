@@ -137,6 +137,28 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		expect(el.querySelector(".best-mermaid-error")).toBeNull();
 	});
 
+	it("容器守卫：内置渲染器事后覆盖我方输出时立即夺回（回归：重开标签页变默认主题）", async () => {
+		const { deps } = makeDeps();
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		processor.handle(GRAPH, el, {} as never);
+		await sleep(300);
+		expect(el.querySelector(".best-mermaid-wrap")).toBeTruthy();
+
+		// 模拟内置渲染器后发制人：清掉我方节点，写入原生 SVG（无 wrap）
+		for (const child of [...el.children]) child.remove();
+		const builtin = document.createElement("div");
+		builtin.className = "mermaid";
+		builtin.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "svg"));
+		el.appendChild(builtin);
+		await sleep(400);
+
+		// 守卫应已触发重渲染，我方 wrap 恢复
+		expect(el.querySelector(".best-mermaid-wrap")).toBeTruthy();
+	});
+
 	it("bm-style 图级指令覆盖全局默认样式", async () => {
 		const { deps } = makeDeps();
 		const processor = new MermaidBlockProcessor(deps);
