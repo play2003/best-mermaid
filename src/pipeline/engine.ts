@@ -25,9 +25,32 @@ export class RenderEngine {
 	) {}
 
 	async render(source: string, theme: ThemeProfile, directive?: Record<string, unknown> | null): Promise<string> {
-		const run = this.queue.then(() => this.doRender(source, theme, directive));
+		const run = this.queue.then(() => this.doRenderWithTimeout(source, theme, directive));
 		this.queue = run.catch(() => {}); // 单图失败不阻断后续渲染
 		return run;
+	}
+
+	/**
+	 * 单图渲染超时保护：个别图在真实环境（Electron/字体/布局）可能让 mermaid.render
+	 * 永不返回，串行队列会被堵死，其后所有图空白。超时转为失败 → 错误框可见化，
+	 * 队列放行后续图。
+	 */
+	private doRenderWithTimeout(
+		source: string,
+		theme: ThemeProfile,
+		directive?: Record<string, unknown> | null,
+	): Promise<string> {
+		const TIMEOUT = 15_000;
+		let timer: number | undefined;
+		const timeout = new Promise<never>((_, reject) => {
+			timer = window.setTimeout(
+				() => reject(new Error(`Mermaid render timed out after ${TIMEOUT / 1000}s (diagram too complex or engine hung)`)),
+				TIMEOUT,
+			);
+		});
+		return Promise.race([this.doRender(source, theme, directive), timeout]).finally(() => {
+			if (timer !== undefined) window.clearTimeout(timer);
+		});
 	}
 
 	private async doRender(
