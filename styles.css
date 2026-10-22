@@ -12,24 +12,12 @@
 	justify-content: flex-start; /* 默认左对齐 */
 }
 
-/* 收缩层：让右下角按钮锚定"图"的实际边界，而不是整行容器右端。
-   注意：不能用 display:flex——svg 作为 flex 子项的尺寸计算规则不同，
-   会改变预览图大小与缩放观感；用 width:fit-content 收缩，svg 保持块级原样 */
-.best-mermaid-figure {
-	position: relative;
-	width: fit-content;
-	max-width: 100%;
-}
-
-.best-mermaid-figure > svg {
-	display: block;
-}
-
-/* 右下角导出按钮：常驻低存在感，悬停图表/按钮时提亮 */
+/* 右下角导出按钮：位置由 JS 按 svg 实际渲染框设置（left/top），
+   不参与文档流、不影响图布局；常驻低存在感，悬停图表/按钮时提亮 */
 .best-mermaid-export {
 	position: absolute;
-	right: 4px;
-	bottom: 4px;
+	left: 0;
+	top: 0;
 	margin: 0;
 	padding: 1px 5px;
 	font-family: inherit;

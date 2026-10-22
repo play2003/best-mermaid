@@ -17,16 +17,17 @@ export class PostProcessor {
 		// svg 包一层 wrapper：水平对齐的 flex 布局只作用于 svg，
 		// 容器内的其他子节点（角标、其他插件注入的按钮）不参与布局
 		const wrap = el.createDiv({ cls: "best-mermaid-wrap" });
-		// 收缩层：让右下角按钮锚定"图"的实际边界，而不是整行容器的右端
-		const figure = wrap.createDiv({ cls: "best-mermaid-figure" });
 
 		// 官方规范禁用 innerHTML；DOMParser 严格 XML 解析优先（脚本不执行，安全）
 		const svg = this.parseSvg(svgString);
 		// 解析失败必须可见化——曾因静默返回 null 导致部分图无声消失、无错误框
 		if (!svg) throw new Error("Failed to parse rendered SVG");
-		figure.appendChild(svg);
+		// 注意：svg 必须是 wrap 的直接子节点（与引入按钮前的结构一致）——
+		// mermaid 的 svg 带 width="100%"，任何包裹收缩层都会改变其尺寸解析，
+		// 导致预览大小与缩放锚点异常。按钮改由 processor 按 svg 实际渲染框定位。
+		wrap.appendChild(svg);
 
-		if (onExport) this.attachExportButton(figure, svg, onExport);
+		if (onExport) this.attachExportButton(el, svg, onExport);
 
 		// 保留 mermaid 计算的自然尺寸上限（内联 max-width: Npx）：
 		// 窄图不拉伸到容器宽度（否则 viewBox 等比放大导致字号异常），
@@ -40,10 +41,10 @@ export class PostProcessor {
 		return svg;
 	}
 
-	/** 图的右下角导出按钮：常驻低透明度，悬停图表提亮；导出期间禁用防连点 */
-	private attachExportButton(figure: HTMLElement, svg: SVGSVGElement, onExport: ExportHandler): void {
+	/** 图的右下角导出按钮（挂在容器上，位置由 processor 按 svg 渲染框计算） */
+	private attachExportButton(el: HTMLElement, svg: SVGSVGElement, onExport: ExportHandler): void {
 		const label = t("exportPng");
-		const btn = figure.createEl("button", { cls: "best-mermaid-export", text: "PNG" });
+		const btn = el.createEl("button", { cls: "best-mermaid-export", text: "PNG" });
 		btn.type = "button";
 		btn.title = label;
 		btn.setAttribute("aria-label", label);

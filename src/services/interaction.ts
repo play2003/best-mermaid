@@ -44,6 +44,8 @@ export class InteractionService {
 			container.dataset.bmTy = String(state.ty);
 			// 小手光标：放大后可拖（悬停 grab / 拖拽中 grabbing）
 			container.style.cursor = state.scale > 1 ? (dragging ? "grabbing" : "grab") : "";
+			// 通知外部覆盖层（导出按钮）跟随变换后的 svg 位置
+			container.dispatchEvent(new CustomEvent("bm-transform"));
 		};
 
 		/** 以 (clientX, clientY) 为锚点缩放：保持鼠标下的图内容不动 */

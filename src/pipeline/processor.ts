@@ -13,6 +13,8 @@ export class MermaidBlockProcessor {
 	private seq = new WeakMap<HTMLElement, number>();
 	/** 每笔记的图序号计数器（导出文件名用） */
 	private figureCounters = new Map<string, number>();
+	/** 导出按钮的尺寸跟随观察器（每容器一个） */
+	private buttonObservers = new Map<HTMLElement, ResizeObserver>();
 	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
 	private version = 0;
 	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
@@ -49,6 +51,8 @@ export class MermaidBlockProcessor {
 		this.observer = null;
 		for (const guard of this.guards.values()) guard.disconnect();
 		this.guards.clear();
+		for (const ro of this.buttonObservers.values()) ro.disconnect();
+		this.buttonObservers.clear();
 		this.figureCounters.clear();
 	}
 
@@ -139,7 +143,11 @@ export class MermaidBlockProcessor {
 			const svgEl = this.deps.postProcessor.enhance(el, svg, (target) =>
 				this.deps.exporter.exportPng(target, { filename, background, scale: 2 }),
 			);
-			if (svgEl) this.deps.interaction.attach(el, svgEl);
+			if (svgEl) {
+				this.deps.interaction.attach(el, svgEl);
+				const btn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
+				if (btn) this.glueExportButton(el, svgEl, btn);
+			}
 			this.attachGuard(el, source);
 		} catch (e) {
 			this.deps.errorBoundary.render(el, e, source);
@@ -171,6 +179,46 @@ export class MermaidBlockProcessor {
 	}
 
 	/**
+	 * 导出按钮跟随 svg 的实际渲染框（右下角内缩 4px）：
+	 * - rAF 首帧定位（此时布局已完成）
+	 * - 交互缩放/平移时由 interaction 在容器上派发 bm-transform 事件触发重定位
+	 * - 容器尺寸变化（窗口 resize/对齐切换）由 ResizeObserver 兜底
+	 * 按钮是容器的绝对定位子节点，不参与文档流，零布局影响。
+	 */
+	private glueExportButton(el: HTMLElement, svg: SVGSVGElement, btn: HTMLButtonElement): void {
+		const place = () => {
+			if (!el.isConnected) return;
+			const cr = el.getBoundingClientRect();
+			const sr = svg.getBoundingClientRect();
+			btn.style.left = `${Math.max(0, sr.left - cr.left + sr.width - btn.offsetWidth - 4)}px`;
+			btn.style.top = `${Math.max(0, sr.top - cr.top + sr.height - btn.offsetHeight - 4)}px`;
+		};
+
+		requestAnimationFrame(place);
+
+		// 每个容器只挂一次 bm-transform 监听（容器跨渲染复用），回调里现查当前 svg/按钮
+		if (el.dataset.bmGlue !== "1") {
+			el.dataset.bmGlue = "1";
+			el.addEventListener("bm-transform", () => {
+				const curSvg = el.querySelector<SVGSVGElement>(".best-mermaid-wrap svg");
+				const curBtn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
+				if (!curSvg || !curBtn) return;
+				const cr = el.getBoundingClientRect();
+				const sr = curSvg.getBoundingClientRect();
+				curBtn.style.left = `${Math.max(0, sr.left - cr.left + sr.width - curBtn.offsetWidth - 4)}px`;
+				curBtn.style.top = `${Math.max(0, sr.top - cr.top + sr.height - curBtn.offsetHeight - 4)}px`;
+			});
+		}
+
+		this.buttonObservers.get(el)?.disconnect();
+		if (typeof ResizeObserver !== "undefined") {
+			const ro = new ResizeObserver(place);
+			ro.observe(el);
+			this.buttonObservers.set(el, ro);
+		}
+	}
+
+	/**
 	 * 导出 PNG 的底色：与渲染优先级一致——图内 init 指令 > 样式卡解析结果 > 页面背景 > 白。
 	 */
 	private exportBackground(theme: ThemeProfile, directive: Record<string, unknown> | null): string {
@@ -191,7 +239,7 @@ export class MermaidBlockProcessor {
 	 * 其他插件对同一容器通常有"只注入一次"守卫，清掉了它们不会补回来。
 	 */
 	private clearOwn(el: HTMLElement): void {
-		const own = ["best-mermaid-wrap", "best-mermaid-badge", "best-mermaid-error"];
+		const own = ["best-mermaid-wrap", "best-mermaid-badge", "best-mermaid-error", "best-mermaid-export"];
 		for (const child of Array.from(el.children)) {
 			if (own.some((cls) => child.hasClass(cls))) child.remove();
 		}

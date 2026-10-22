@@ -171,9 +171,8 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 
 		const btn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
 		expect(btn).toBeTruthy();
-		// 按钮在 figure 层内（贴图的右下角而不是整行右端）
-		expect(btn!.parentElement?.hasClass("best-mermaid-figure")).toBe(true);
-		expect(btn!.parentElement?.parentElement?.hasClass("best-mermaid-wrap")).toBe(true);
+		// 按钮是容器的绝对定位子节点（不进入 wrap，零布局影响；位置由 JS 计算）
+		expect(btn!.parentElement).toBe(el);
 		expect(btn!.type).toBe("button");
 
 		btn!.click();
