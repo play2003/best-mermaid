@@ -179,36 +179,31 @@ export class MermaidBlockProcessor {
 	}
 
 	/**
-	 * 导出按钮跟随 svg 的实际渲染框（右下角内缩 4px）：
+	 * 导出按钮定位在图的右下角（内缩 4px）：
 	 * - rAF 首帧定位（此时布局已完成）
-	 * - 交互缩放/平移时由 interaction 在容器上派发 bm-transform 事件触发重定位
-	 * - 容器尺寸变化（窗口 resize/对齐切换）由 ResizeObserver 兜底
+	 * - 容器尺寸变化（窗口 resize/对齐切换）由 ResizeObserver 重新贴合图边缘
+	 * - 缩放/拖拽时不跟随（按钮位置保持稳定）
 	 * 按钮是容器的绝对定位子节点，不参与文档流，零布局影响。
 	 */
 	private glueExportButton(el: HTMLElement, svg: SVGSVGElement, btn: HTMLButtonElement): void {
 		const place = () => {
 			if (!el.isConnected) return;
+			// getBoundingClientRect 含缩放/平移变换；用 dataset 中记录的变换状态反算
+			// svg 的"布局框"，让按钮锚定在图的原始右下角（缩放/拖拽时按钮不移动）
+			const scale = Number(el.dataset.bmScale) || 1;
+			const tx = Number(el.dataset.bmTx) || 0;
+			const ty = Number(el.dataset.bmTy) || 0;
 			const cr = el.getBoundingClientRect();
 			const sr = svg.getBoundingClientRect();
-			btn.style.left = `${Math.max(0, sr.left - cr.left + sr.width - btn.offsetWidth - 4)}px`;
-			btn.style.top = `${Math.max(0, sr.top - cr.top + sr.height - btn.offsetHeight - 4)}px`;
+			const layoutLeft = sr.left - cr.left - tx;
+			const layoutTop = sr.top - cr.top - ty;
+			const layoutWidth = sr.width / (scale || 1);
+			const layoutHeight = sr.height / (scale || 1);
+			btn.style.left = `${Math.max(0, layoutLeft + layoutWidth - btn.offsetWidth - 4)}px`;
+			btn.style.top = `${Math.max(0, layoutTop + layoutHeight - btn.offsetHeight - 4)}px`;
 		};
 
 		requestAnimationFrame(place);
-
-		// 每个容器只挂一次 bm-transform 监听（容器跨渲染复用），回调里现查当前 svg/按钮
-		if (el.dataset.bmGlue !== "1") {
-			el.dataset.bmGlue = "1";
-			el.addEventListener("bm-transform", () => {
-				const curSvg = el.querySelector<SVGSVGElement>(".best-mermaid-wrap svg");
-				const curBtn = el.querySelector<HTMLButtonElement>(".best-mermaid-export");
-				if (!curSvg || !curBtn) return;
-				const cr = el.getBoundingClientRect();
-				const sr = curSvg.getBoundingClientRect();
-				curBtn.style.left = `${Math.max(0, sr.left - cr.left + sr.width - curBtn.offsetWidth - 4)}px`;
-				curBtn.style.top = `${Math.max(0, sr.top - cr.top + sr.height - curBtn.offsetHeight - 4)}px`;
-			});
-		}
 
 		this.buttonObservers.get(el)?.disconnect();
 		if (typeof ResizeObserver !== "undefined") {
