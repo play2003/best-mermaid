@@ -25,6 +25,10 @@ Install it, open a note, and it just looks right.
 
 *Click the download icon at the bottom-right of any diagram: edit the file name, pick 1x–4x quality, and save anywhere through the native save dialog.*
 
+![Style gallery in settings](./images/settings-styles.png)
+
+*The style gallery: four built-in style packs with live swatches. Pick a default here; override any single diagram with `%% bm-style: <id> %%`.*
+
 ## Why another mermaid plugin?
 
 There are several mermaid appearance plugins already. Best Mermaid differs in a few ways:
