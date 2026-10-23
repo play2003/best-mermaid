@@ -30,10 +30,13 @@ const context = await esbuild.context({
 		...builtinModules,
 	],
 	format: "cjs",
-	target: "es2018",
+	target: "es2020",
 	logLevel: "info",
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
+	minify: prod,
+	pure: ["console.log", "console.debug"],
+	legalComments: "none",
 	outfile: "main.js",
 });
 
