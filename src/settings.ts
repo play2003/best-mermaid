@@ -45,8 +45,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		this.renderStyleGallery();
-
+		// 官方 UI 指南：常规设置置于最上方且不加标题；分区标题用 setHeading
 		new Setting(containerEl)
 			.setName(t("layoutEngine"))
 			.setDesc(t("layoutEngineDesc"))
@@ -100,12 +99,14 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}),
 			);
+
+		this.renderStyleGallery();
 	}
 
 	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作） */
 	private renderStyleGallery(): void {
 		const section = this.containerEl.createDiv({ cls: "bm-style-section" });
-		new Setting(section).setName(t("styles")).setDesc(t("stylesDesc"));
+		new Setting(section).setName(t("styles")).setDesc(t("stylesDesc")).setHeading();
 
 		const grid = section.createDiv({ cls: "bm-style-grid" });
 		for (const style of this.plugin.registry.list()) {
