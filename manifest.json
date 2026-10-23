@@ -1,9 +1,10 @@
 {
 	"id": "best-mermaid",
 	"name": "Best Mermaid",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"minAppVersion": "1.4.0",
-	"description": "Take over mermaid rendering: theme-aware styling, style packs, pan & zoom, SVG/PNG export, and readable error messages.",
-	"author": "best-mermaid",
+	"description": "Take over mermaid rendering in reading view with theme-aware styling, style packs, pan & zoom, PNG export, and readable error messages.",
+	"author": "play2003",
+	"authorUrl": "https://github.com/play2003",
 	"isDesktopOnly": true
 }
