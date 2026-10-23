@@ -84,30 +84,31 @@ async function savePng(blob: Blob, filename: string): Promise<string | null> {
 	const safeName = sanitizeName(filename);
 	let dialog: ElectronDialog | undefined;
 	try {
-		dialog = req?.("@electron/remote")?.dialog;
+		const remote = req?.("@electron/remote") as ElectronRemote | undefined;
+		dialog = remote?.dialog;
 	} catch {
 		dialog = undefined;
 	}
 
-	if (dialog?.showSaveDialog) {
+	if (dialog) {
 		const result = await dialog.showSaveDialog({
 			defaultPath: `${safeName}.png`,
 			filters: [{ name: "PNG", extensions: ["png"] }],
 		});
 		if (result.canceled || !result.filePath) return null;
 		const buffer = Buffer.from(await blob.arrayBuffer());
-		const fs = req?.("fs");
+		const fs = req?.("fs") as NodeFs | undefined;
 		if (!fs?.promises?.writeFile) throw new Error("Node fs unavailable");
 		await fs.promises.writeFile(result.filePath, buffer);
 		return result.filePath;
 	}
 
 	// 兜底：浏览器下载（无法选位置，进入系统默认下载目录）
-	const a = document.createElement("a");
+	const a = createEl("a");
 	a.href = URL.createObjectURL(blob);
 	a.download = `${safeName}.png`;
 	a.click();
-	setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+	window.setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 	return `${t("downloadsFolder")}${safeName}.png`;
 }
 
@@ -118,9 +119,18 @@ interface ElectronDialog {
 	}): Promise<{ canceled: boolean; filePath?: string }>;
 }
 
+interface ElectronRemote {
+	dialog?: ElectronDialog;
+}
+
+interface NodeFs {
+	promises?: {
+		writeFile?: (path: string, data: Buffer) => Promise<void>;
+	};
+}
+
 /** Obsidian 桌面端暴露的 CommonJS require；网页/测试环境没有则返回 null */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- 动态模块返回类型无法静态约束
-type NodeRequire = (module: string) => any;
+type NodeRequire = (module: string) => unknown;
 
 function getNodeRequire(): NodeRequire | null {
 	const req = (window as unknown as { require?: NodeRequire }).require;

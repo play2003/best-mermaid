@@ -28,7 +28,7 @@ export class MermaidBlockProcessor {
 		this.observer = new MutationObserver((mutations) => {
 			for (const m of mutations) {
 				for (const node of Array.from(m.addedNodes)) {
-					if (!(node instanceof HTMLElement)) continue;
+					if (!node.instanceOf(HTMLElement)) continue;
 					const targets = node.matches(".best-mermaid-container")
 						? [node]
 						: Array.from(node.querySelectorAll<HTMLElement>(".best-mermaid-container"));

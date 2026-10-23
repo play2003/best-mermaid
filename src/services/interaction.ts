@@ -39,13 +39,15 @@ export class InteractionService {
 		let snapTimer: number | undefined;
 
 		const apply = (animate = false) => {
-			svg.style.transition = animate ? "" : "none";
-			svg.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+			svg.setCssStyles({
+				transition: animate ? "" : "none",
+				transform: `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`,
+			});
 			container.dataset.bmScale = String(state.scale);
 			container.dataset.bmTx = String(state.tx);
 			container.dataset.bmTy = String(state.ty);
 			// 小手光标：放大后可拖（悬停 grab / 拖拽中 grabbing）
-			container.style.cursor = state.scale > 1 ? (dragging ? "grabbing" : "grab") : "";
+			container.setCssStyles({ cursor: state.scale > 1 ? (dragging ? "grabbing" : "grab") : "" });
 		};
 
 		/** 清除落在本图容器内的文字选区（缩放手势开始时调用；不影响页面上其他选区） */
@@ -101,7 +103,7 @@ export class InteractionService {
 			// 并立即关闭选择，抬手时恢复。
 			ev.preventDefault();
 			panArmed = true;
-			container.style.userSelect = "none";
+			container.setCssStyles({ userSelect: "none" });
 			downX = ev.clientX;
 			downY = ev.clientY;
 			container.setPointerCapture(ev.pointerId);
@@ -126,7 +128,7 @@ export class InteractionService {
 			if (!panArmed) return;
 			panArmed = false;
 			dragging = false;
-			container.style.userSelect = ""; // 恢复文本选择（未移动的单击也走这里）
+			container.setCssStyles({ userSelect: "" }); // 恢复文本选择（未移动的单击也走这里）
 			try {
 				container.releasePointerCapture(ev.pointerId);
 			} catch {

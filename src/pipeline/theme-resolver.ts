@@ -72,15 +72,15 @@ export class ThemeResolver {
 	/** 通过探针元素把 CSS 变量解析为计算后的 "rgb(r, g, b)"，解析失败返回 null */
 	private resolveColor(varName: string): string | null {
 		if (!this.probeEl) {
-			this.probeEl = document.createElement("span");
-			this.probeEl.style.display = "none";
+			this.probeEl = createSpan();
+			this.probeEl.setCssStyles({ display: "none" });
 			document.body.appendChild(this.probeEl);
 			this.cleanupRegistry?.(() => {
 				this.probeEl?.remove();
 				this.probeEl = null;
 			});
 		}
-		this.probeEl.style.color = `var(${varName})`;
+		this.probeEl.setCssStyles({ color: `var(${varName})` });
 		const computed = getComputedStyle(this.probeEl).color;
 		// 变量不存在或非法时 color 会回退为继承值，这里只认 rgb/rgba 形式
 		return /^rgba?\(/.test(computed) ? computed : null;

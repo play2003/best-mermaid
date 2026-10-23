@@ -85,8 +85,9 @@
 	transition: transform 0.08s ease-out;
 }
 
-/* 设置页 · 样式画廊 */
-.bm-style-section {
+/* 设置页 · 样式画廊（声明式设置的自定义渲染行） */
+.bm-style-setting {
+	display: block;
 	border-top: 1px solid var(--background-modifier-border);
 	margin-top: 16px;
 	padding-top: 8px;

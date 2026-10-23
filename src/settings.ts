@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, PluginSettingTab, Setting, type SettingDefinitionItem } from "obsidian";
 import type BestMermaidPlugin from "./main";
 import type { StyleCard } from "./styles/types";
 import { t, tStyle } from "./i18n";
@@ -41,74 +41,68 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		containerEl.empty();
-
-		// 官方 UI 指南：常规设置置于最上方且不加标题；分区标题用 setHeading
-		new Setting(containerEl)
-			.setName(t("layoutEngine"))
-			.setDesc(t("layoutEngineDesc"))
-			.addDropdown((d) =>
-				d
-					.addOptions({
+	/** 声明式设置（Obsidian 1.13+）：常规设置在顶部，样式画廊作为自定义渲染分区 */
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return [
+			{
+				name: t("layoutEngine"),
+				desc: t("layoutEngineDesc"),
+				control: {
+					type: "dropdown",
+					key: "layoutEngine",
+					defaultValue: "auto",
+					options: {
 						auto: t("engineAuto"),
 						dagre: t("engineDagre"),
 						elk: t("engineElk"),
-					})
-					.setValue(this.plugin.settings.layoutEngine)
-					.onChange(async (v) => {
-						this.plugin.settings.layoutEngine = v as BestMermaidSettings["layoutEngine"];
-						await this.plugin.saveSettings();
-						this.plugin.onStyleChange();
-					}),
-			);
+					},
+				},
+			},
+			{
+				name: t("horizontalAlignment"),
+				desc: t("horizontalAlignmentDesc"),
+				control: {
+					type: "dropdown",
+					key: "imageAlign",
+					defaultValue: "left",
+					options: { left: t("alignLeft"), center: t("alignCenter"), right: t("alignRight") },
+				},
+			},
+			{
+				name: t("renderDebounce"),
+				desc: t("renderDebounceDesc"),
+				control: { type: "text", key: "debounceMs", defaultValue: String(DEFAULT_SETTINGS.debounceMs) },
+			},
+			{
+				name: t("enableZoom"),
+				control: { type: "toggle", key: "zoomEnabled", defaultValue: DEFAULT_SETTINGS.zoomEnabled },
+			},
+			{
+				name: t("styles"),
+				desc: t("stylesDesc"),
+				render: (setting) => {
+					setting.settingEl.addClass("bm-style-setting");
+					this.renderStyleGallery(setting.settingEl);
+				},
+			},
+		];
+	}
 
-		new Setting(containerEl)
-			.setName(t("horizontalAlignment"))
-			.setDesc(t("horizontalAlignmentDesc"))
-			.addDropdown((d) =>
-				d
-					.addOptions({ left: t("alignLeft"), center: t("alignCenter"), right: t("alignRight") })
-					.setValue(this.plugin.settings.imageAlign)
-					.onChange(async (v) => {
-						this.plugin.settings.imageAlign = v as BestMermaidSettings["imageAlign"];
-						await this.plugin.saveSettings();
-						this.plugin.onStyleChange();
-					}),
-			);
+	getControlValue(key: string): unknown {
+		if (key === "debounceMs") return String(this.plugin.settings.debounceMs);
+		return (this.plugin.settings as unknown as Record<string, unknown>)[key];
+	}
 
-		new Setting(containerEl)
-			.setName(t("renderDebounce"))
-			.setDesc(t("renderDebounceDesc"))
-			.addText((t2) =>
-				t2.setValue(String(this.plugin.settings.debounceMs)).onChange(async (v) => {
-					const n = Number(v);
-					if (Number.isFinite(n) && n >= 0) {
-						this.plugin.settings.debounceMs = n;
-						await this.plugin.saveSettings();
-					}
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName(t("enableZoom"))
-			.addToggle((t2) =>
-				t2.setValue(this.plugin.settings.zoomEnabled).onChange(async (v) => {
-					this.plugin.settings.zoomEnabled = v;
-					await this.plugin.saveSettings();
-				}),
-			);
-
-		this.renderStyleGallery();
+	async setControlValue(key: string, value: unknown): Promise<void> {
+		const record = this.plugin.settings as unknown as Record<string, unknown>;
+		record[key] = key === "debounceMs" ? Math.max(0, Number(value) || 0) : value;
+		await this.plugin.saveSettings();
+		if (key === "layoutEngine" || key === "imageAlign") this.plugin.onStyleChange();
 	}
 
 	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作） */
-	private renderStyleGallery(): void {
-		const section = this.containerEl.createDiv({ cls: "bm-style-section" });
-		new Setting(section).setName(t("styles")).setDesc(t("stylesDesc")).setHeading();
-
-		const grid = section.createDiv({ cls: "bm-style-grid" });
+	private renderStyleGallery(container: HTMLElement): void {
+		const grid = container.createDiv({ cls: "bm-style-grid" });
 		for (const style of this.plugin.registry.list()) {
 			this.renderStyleCard(grid, style);
 		}
@@ -121,7 +115,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		const swatches = card.createDiv({ cls: "bm-style-swatches" });
 		if (style.swatches.length > 0) {
 			for (const color of style.swatches) {
-				swatches.createDiv({ cls: "bm-style-swatch" }).style.backgroundColor = color;
+				swatches.createDiv({ cls: "bm-style-swatch" }).setCssStyles({ backgroundColor: color });
 			}
 		} else {
 			// dynamic 卡无固定色板：渲染主题色渐变占位
@@ -143,18 +137,22 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 
 		const actions = card.createDiv({ cls: "bm-style-actions" });
 		if (style.id !== this.plugin.settings.defaultStyleId) {
-			actions.createEl("button", { text: t("setAsDefault") }).addEventListener("click", async () => {
-				this.plugin.settings.defaultStyleId = style.id;
-				await this.plugin.saveSettings();
-				this.plugin.onStyleChange();
-				this.display();
+			actions.createEl("button", { text: t("setAsDefault") }).addEventListener("click", () => {
+				void this.setDefaultStyle(style.id);
 			});
 		}
 		if (!this.plugin.registry.isBuiltin(style.id)) {
 			actions.createEl("button", { text: t("delete") }).addEventListener("click", () => {
 				this.plugin.registry.deleteUser(style.id);
-				this.display();
+				this.update();
 			});
 		}
+	}
+
+	private async setDefaultStyle(styleId: string): Promise<void> {
+		this.plugin.settings.defaultStyleId = styleId;
+		await this.plugin.saveSettings();
+		this.plugin.onStyleChange();
+		this.update();
 	}
 }

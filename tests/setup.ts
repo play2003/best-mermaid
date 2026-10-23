@@ -46,6 +46,29 @@ if (proto && !proto.addClass) {
 	};
 }
 
+// Obsidian 全局 API 桩（生产代码遵循审查规范使用这些助手）
+const anyGlobal = globalThis as any;
+if (typeof anyGlobal.createEl !== "function") {
+	anyGlobal.createEl = (tag: string) => document.createElement(tag);
+	anyGlobal.createDiv = () => document.createElement("div");
+	anyGlobal.createSpan = () => document.createElement("span");
+}
+const nodeProto: any = (globalThis as any).Node?.prototype;
+if (nodeProto && !nodeProto.instanceOf) {
+	nodeProto.instanceOf = function (Type: any) {
+		return this instanceof Type;
+	};
+}
+const elemProto: any = (globalThis as any).Element?.prototype;
+if (elemProto && !elemProto.setCssStyles) {
+	elemProto.setCssStyles = function (styles: Record<string, string>) {
+		Object.assign(this.style, styles);
+	};
+	elemProto.setCssProps = function (props: Record<string, string>) {
+		for (const [k, v] of Object.entries(props)) this.style.setProperty(k, v);
+	};
+}
+
 // jsdom 没有 SVG 元素布局测量，mermaid 渲染依赖 getBBox 与文本测宽
 for (const name of ["SVGGElement", "SVGTextElement", "SVGGraphicsElement", "SVGElement"]) {
 	const Ctor = (globalThis as any)[name];

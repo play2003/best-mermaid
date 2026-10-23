@@ -33,7 +33,7 @@ export class PostProcessor {
 		// 保留 mermaid 计算的自然尺寸上限（内联 max-width: Npx）：
 		// 窄图不拉伸到容器宽度（否则 viewBox 等比放大导致字号异常），
 		// 只在容器更窄时按比例缩小
-		if (!svg.style.maxWidth) svg.style.maxWidth = "100%";
+		if (!svg.style.maxWidth) svg.setCssStyles({ maxWidth: "100%" });
 
 		// 右上角低调角标，标识渲染来源（悬停时变清晰）
 		el.createDiv({ cls: "best-mermaid-badge", text: "best-mermaid" });
@@ -50,36 +50,39 @@ export class PostProcessor {
 		btn.title = label;
 		btn.setAttribute("aria-label", label);
 		setIcon(btn, "download");
-		btn.addEventListener("click", async (ev) => {
+		btn.addEventListener("click", (ev) => {
 			ev.stopPropagation();
-			if (btn.disabled) return;
-			btn.disabled = true;
-			try {
-				await onExport(svg);
-			} catch (e) {
-				console.warn("[best-mermaid] PNG export failed:", e);
-			} finally {
-				btn.disabled = false;
-			}
+			void this.runExport(btn, svg, onExport);
 		});
+	}
+
+	private async runExport(btn: HTMLButtonElement, svg: SVGSVGElement, onExport: ExportHandler): Promise<void> {
+		if (btn.disabled) return;
+		btn.disabled = true;
+		try {
+			await onExport(svg);
+		} catch (e) {
+			console.warn("[best-mermaid] PNG export failed:", e);
+		} finally {
+			btn.disabled = false;
+		}
 	}
 
 	/**
 	 * 解析 mermaid 输出的 SVG：
 	 * 1) 严格 XML（image/svg+xml）——干净安全的默认路径
-	 * 2) XML 失败时用 Range 的 HTML 片段解析器兜底——mermaid 的 htmlLabels 会输出
-	 *    HTML 风格标记（如未自闭合的 <br>），在 XML 下是非法文档
-	 * 两条路径都是惰性解析，脚本不会执行。
+	 * 2) 失败时用 HTML 解析器兜底（DOMParser "text/html"，惰性文档，脚本不执行）——
+	 *    mermaid 旧版 htmlLabels 会输出 HTML 风格标记，在 XML 下是非法文档
 	 */
 	private parseSvg(svgString: string): SVGSVGElement | null {
 		const xmlDoc = new DOMParser().parseFromString(svgString, "image/svg+xml");
 		const root = xmlDoc.documentElement;
 		if (root && root.nodeName === "svg") {
 			const imported = document.importNode(root, true);
-			if (imported instanceof SVGSVGElement) return imported;
+			if (imported.instanceOf(SVGSVGElement)) return imported;
 		}
-		const fragment = document.createRange().createContextualFragment(svgString);
-		const svg = fragment.querySelector("svg");
-		return svg instanceof SVGSVGElement ? svg : null;
+		const htmlDoc = new DOMParser().parseFromString(svgString, "text/html");
+		const svg = htmlDoc.body.querySelector("svg");
+		return svg && svg.instanceOf(SVGSVGElement) ? svg : null;
 	}
 }

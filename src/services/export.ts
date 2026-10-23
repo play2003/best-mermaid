@@ -64,7 +64,7 @@ export class ExportService implements PngExporter {
 		const url = URL.createObjectURL(new Blob([serialized], { type: "image/svg+xml;charset=utf-8" }));
 		try {
 			const img = await this.loadImage(url);
-			const canvas = document.createElement("canvas");
+			const canvas = createEl("canvas");
 			canvas.width = fit.pixelWidth;
 			canvas.height = fit.pixelHeight;
 			const ctx = canvas.getContext("2d");
@@ -110,9 +110,7 @@ export class ExportService implements PngExporter {
 	private prepareClone(svg: SVGSVGElement): { clone: SVGSVGElement; width: number; height: number } {
 		const { width, height } = this.measure(svg);
 		const clone = svg.cloneNode(true) as SVGSVGElement;
-		clone.style.transform = "";
-		clone.style.transition = "";
-		clone.style.maxWidth = "none";
+		clone.setCssStyles({ transform: "", transition: "", maxWidth: "none" });
 		clone.setAttribute("width", String(Math.ceil(width)));
 		clone.setAttribute("height", String(Math.ceil(height)));
 		return { clone, width, height };
@@ -166,10 +164,10 @@ export class ExportService implements PngExporter {
 	}
 
 	private download(blob: Blob, filename: string): void {
-		const a = document.createElement("a");
+		const a = createEl("a");
 		a.href = URL.createObjectURL(blob);
 		a.download = filename;
 		a.click();
-		setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+		window.setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 	}
 }

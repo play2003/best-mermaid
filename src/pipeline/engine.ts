@@ -98,7 +98,7 @@ export class RenderEngine {
 		}
 
 		if (directive) this.applyDirective(config, directive);
-		mermaid.initialize(config as Parameters<typeof mermaid.initialize>[0]);
+		mermaid.initialize(config);
 
 		try {
 			const { svg } = await mermaid.render(id, source);
@@ -110,7 +110,7 @@ export class RenderEngine {
 			if (config.layout === "elk") {
 				const fallbackId = this.nextRenderId();
 				try {
-					mermaid.initialize({ ...config, layout: "dagre", elk: {} } as Parameters<typeof mermaid.initialize>[0]);
+					mermaid.initialize({ ...config, layout: "dagre", elk: {} });
 					const { svg } = await mermaid.render(fallbackId, source);
 					return svg;
 				} catch (e2) {
