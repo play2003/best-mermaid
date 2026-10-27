@@ -389,3 +389,9 @@
 .best-mermaid-container.bm-tuning svg {
 	transition: none;
 }
+
+/* 编辑态：节点与连线可点选的指针反馈 */
+.best-mermaid-container.bm-tuning g.node,
+.best-mermaid-container.bm-tuning path[data-id] {
+	cursor: pointer;
+}

@@ -181,3 +181,45 @@ describe("V 键微调：生命周期", () => {
 		expect(el.classList.contains("bm-tuning")).toBe(false);
 	});
 });
+
+describe("V 键微调：连线选中的命中容差", () => {
+	const down = (target: Element, x: number, y: number) =>
+		target.dispatchEvent(
+			new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true }),
+		);
+
+	it("点在细线附近（8px 内）也能选中连线", () => {
+		const { el, svg } = makeHarness();
+		press(el, "v");
+		down(svg, 120, 55); // 线在 y=50，偏 5px
+		const overlay = el.querySelector(".best-mermaid-tune-layer")!;
+		expect(overlay.querySelector(".bm-tune-edge-hl")).toBeTruthy();
+		expect(overlay.querySelectorAll(".bm-tune-handle").length).toBeGreaterThanOrEqual(2);
+	});
+
+	it("点击边标签选中连线（标签遮挡线段的场景）", () => {
+		const { el, svg } = makeHarness();
+		press(el, "v");
+		const label = document.createElementNS(SVG_NS, "g");
+		label.setAttribute("class", "edgeLabel");
+		const inner = document.createElementNS(SVG_NS, "g");
+		inner.setAttribute("class", "label");
+		inner.setAttribute("data-id", "L_A_B_0");
+		label.appendChild(inner);
+		svg.appendChild(label);
+
+		down(inner, 130, 50);
+		const overlay = el.querySelector(".best-mermaid-tune-layer")!;
+		expect(overlay.querySelector(".bm-tune-edge-hl")).toBeTruthy();
+	});
+
+	it("点在空白处清空选择", () => {
+		const { el, svg } = makeHarness();
+		press(el, "v");
+		const node = svg.querySelector('g.node[data-id="A"]')!;
+		down(node, 50, 50);
+		expect(el.querySelector(".bm-tune-outline")).toBeTruthy();
+		down(svg, 280, 180);
+		expect(el.querySelector(".bm-tune-outline")).toBeNull();
+	});
+});

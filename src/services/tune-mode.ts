@@ -513,20 +513,84 @@ export class TuneModeService {
 			return;
 		}
 
+		// 直接点在线上
 		const pathEl = target.closest("path[data-id]") as SVGPathElement | null;
 		if (pathEl) {
 			const id = edgeKey(pathEl);
 			const ref = this.edgeRef(session, id ?? "");
 			if (id && ref) {
-				session.selection = { kind: "edge", id, from: ref.from, to: ref.to };
-				this.renderSelection(session);
-				this.beginSegmentDrag(session, id, ref.from, ref.to, pathEl, ev);
+				this.selectEdge(session, id, ref, pathEl, ev);
+				return;
 			}
+		}
+
+		// 点在边标签上（标签遮挡了线下半段，是"选不中"的常见原因）
+		const edgeLabel = target.closest("g.edgeLabel");
+		if (edgeLabel) {
+			const id = edgeLabel.querySelector("[data-id]")?.getAttribute("data-id") ?? null;
+			const ref = id ? this.edgeRef(session, id) : null;
+			if (id && ref) {
+				const labelPath = findEdgePath(session.svg, id);
+				if (labelPath) {
+					this.selectEdge(session, id, ref, labelPath, ev);
+					return;
+				}
+			}
+		}
+
+		// 细线命中区太小：按几何距离兜底（8px 容差），点击空白处才清空选择
+		const near = this.findEdgeNear(session, ev);
+		if (near) {
+			this.selectEdge(session, near.id, near, near.pathEl, ev);
 			return;
 		}
 
 		session.selection = null;
 		this.renderSelection(session);
+	}
+
+	private selectEdge(
+		session: Session,
+		id: string,
+		ref: { from: string; to: string },
+		pathEl: SVGPathElement,
+		ev: PointerEvent,
+	): void {
+		session.selection = { kind: "edge", id, from: ref.from, to: ref.to };
+		this.renderSelection(session);
+		this.beginSegmentDrag(session, id, ref.from, ref.to, pathEl, ev);
+	}
+
+	/** 距离最近的连线（按 8px 屏幕容差换算到用户坐标） */
+	private findEdgeNear(
+		session: Session,
+		ev: PointerEvent,
+	): { id: string; from: string; to: string; pathEl: SVGPathElement } | null {
+		const point = this.toUser(session, ev.clientX, ev.clientY);
+		const rect = session.svg.getBoundingClientRect();
+		const vb = viewBoxOf(session.svg);
+		if (!point || !vb || rect.width === 0) return null;
+		const tolerance = (8 * vb.width) / rect.width;
+
+		let best: { id: string; from: string; to: string; pathEl: SVGPathElement } | null = null;
+		let bestDistance = Infinity;
+		for (const pathEl of Array.from(session.svg.querySelectorAll("path[data-id]"))) {
+			const id = edgeKey(pathEl);
+			if (!id) continue;
+			const ref = this.edgeRef(session, id);
+			if (!ref) continue;
+			const pts = decodePoints(pathEl as SVGPathElement);
+			if (!pts) continue;
+			let distance = Infinity;
+			for (let i = 0; i < pts.length - 1; i++) {
+				distance = Math.min(distance, distanceToSegment(point, pts[i], pts[i + 1]));
+			}
+			if (distance < bestDistance) {
+				bestDistance = distance;
+				best = { id, from: ref.from, to: ref.to, pathEl: pathEl as SVGPathElement };
+			}
+		}
+		return bestDistance <= tolerance ? best : null;
 	}
 
 	private beginResize(session: Session, nodeId: string, dir: HandleDir, startBox: Box, ev: PointerEvent): void {
@@ -850,7 +914,10 @@ export class TuneModeService {
 		const tuned = session.tune.edges?.[edgeId];
 		if (tuned?.from && tuned.to) return { from: tuned.from, to: tuned.to };
 		const match = /^L_([^_]+)_([^_]+)_\d+$/.exec(edgeId);
-		return match ? { from: match[1], to: match[2] } : null;
+		if (match) return { from: match[1], to: match[2] };
+		// 自定义边 id（A e1@--> B）：从源码扫描结果反查
+		const occurrence = session.scan.edges.find((e) => e.userEdgeId === edgeId);
+		return occurrence ? { from: occurrence.from, to: occurrence.to } : null;
 	}
 
 	/** 当前 svg 上该边的点集（拖动时以实时几何为基准） */
