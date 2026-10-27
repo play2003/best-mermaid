@@ -223,8 +223,13 @@ export function applyTuneOverlay(
 
 		if (tuneEdge?.pts) {
 			// 已保存的点集：端点沿节点边滑动回边界（节点缩放后仍保持连接，不脱离）
-			if (srcBox && tuneEdge.src) points[0] = anchorOnSide(srcBox, tuneEdge.src, points[0]);
-			if (dstBox && tuneEdge.dst) points[points.length - 1] = anchorOnSide(dstBox, tuneEdge.dst, points[points.length - 1]);
+			if (srcBox && tuneEdge.src) {
+				points[0] = pinEndpoint(srcBox, tuneEdge.src, points[0], points[1]).point;
+			}
+			if (dstBox && tuneEdge.dst) {
+				const last = points.length - 1;
+				points[last] = pinEndpoint(dstBox, tuneEdge.dst, points[last], points[last - 1]).point;
+			}
 		} else {
 			if (srcBox) reanchorEnd(points, 0, srcBox, tuneEdge?.src);
 			if (dstBox) reanchorEnd(points, points.length - 1, dstBox, tuneEdge?.dst);
@@ -380,6 +385,74 @@ export function anchorOnSide(box: Box, side: AnchorSide, toward: Point): Point {
 		case "b":
 			return { x: clampX(toward.x), y: bottom };
 	}
+}
+
+/**
+ * 端点钉回节点边界，并保证连线从"面向相邻点的一侧"进入节点。
+ * 否则端点被拖到节点背面时，路径会从节点内部穿过，箭头被节点盖住。
+ */
+export function pinEndpoint(
+	box: Box,
+	preferred: AnchorSide | undefined,
+	point: Point,
+	neighbor: Point,
+): { point: Point; side: AnchorSide } {
+	const initial = preferred ?? sideOf(box, point);
+	const anchor = anchorOnSide(box, initial, point);
+	const side = isOutward(initial, anchor, neighbor) ? initial : sideOf(box, neighbor);
+	return { point: anchorOnSide(box, side, point), side };
+}
+
+function isOutward(side: AnchorSide, anchor: Point, neighbor: Point): boolean {
+	const EPS = 0.5;
+	switch (side) {
+		case "l":
+			return neighbor.x <= anchor.x + EPS;
+		case "r":
+			return neighbor.x >= anchor.x - EPS;
+		case "t":
+			return neighbor.y <= anchor.y + EPS;
+		case "b":
+			return neighbor.y >= anchor.y - EPS;
+	}
+}
+
+/**
+ * 折线简化（Douglas-Peucker）：mermaid 的"直线"常带若干共线冗余点，
+ * 直接改端点只会折弯最后一小段，看起来像从附近位置变成折线。
+ */
+export function simplifyPoints(points: Point[], tolerance = 1.5): Point[] {
+	if (points.length <= 2) return points.map((p) => ({ ...p }));
+	const sqTol = tolerance * tolerance;
+	const keep = new Array<boolean>(points.length).fill(false);
+	keep[0] = keep[points.length - 1] = true;
+	const stack: Array<[number, number]> = [[0, points.length - 1]];
+	while (stack.length > 0) {
+		const [first, last] = stack.pop()!;
+		let maxDistance = -1;
+		let index = -1;
+		for (let i = first + 1; i < last; i++) {
+			const distance = perpendicularDistanceSq(points[i], points[first], points[last]);
+			if (distance > maxDistance) {
+				maxDistance = distance;
+				index = i;
+			}
+		}
+		if (index > 0 && maxDistance > sqTol) {
+			keep[index] = true;
+			stack.push([first, index], [index, last]);
+		}
+	}
+	return points.filter((_, index) => keep[index]).map((p) => ({ ...p }));
+}
+
+function perpendicularDistanceSq(p: Point, a: Point, b: Point): number {
+	const dx = b.x - a.x;
+	const dy = b.y - a.y;
+	const lengthSq = dx * dx + dy * dy;
+	if (lengthSq === 0) return (p.x - a.x) ** 2 + (p.y - a.y) ** 2;
+	const cross = (p.x - a.x) * dy - (p.y - a.y) * dx;
+	return (cross * cross) / lengthSq;
 }
 
 /** 把折线的一端重锚到节点边界；保留正交走向（首末段轴对齐） */

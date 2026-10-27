@@ -283,3 +283,62 @@ describe("V 键微调：连线拖动的吸附与节点连接", () => {
 		expect(pts[1].y).toBe(40); // 首段保持水平
 	});
 });
+
+describe("V 键微调：直线端点拖动的折线/遮挡问题", () => {
+	const down = (target: Element, x: number, y: number) =>
+		target.dispatchEvent(
+			new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true }),
+		);
+	const move = (x: number, y: number) =>
+		window.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, buttons: 1, bubbles: true }));
+	const up = () => window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+	const points = (svg: SVGSVGElement) => decodePoints(svg.querySelector("path[data-id]")!)!;
+
+	function setStraightWithRedundantPoints(svg: SVGSVGElement): SVGPathElement {
+		const path = svg.querySelector("path[data-id]") as SVGPathElement;
+		const pts = [
+			{ x: 85, y: 50 },
+			{ x: 110, y: 50 },
+			{ x: 140, y: 50 },
+			{ x: 170, y: 50 },
+		];
+		path.setAttribute("data-points", btoa(JSON.stringify(pts)));
+		path.setAttribute("d", "M 85,50 L 110,50 L 140,50 L 170,50");
+		return path;
+	}
+
+	it("拖动带冗余共线点的直线端点：整条线跟随，不会折弯成折线", () => {
+		const { el, svg } = makeHarness();
+		setStraightWithRedundantPoints(svg);
+		press(el, "v");
+		down(svg, 120, 50); // 选中连线
+		up(); // 结束这次手势，避免与随后的端点拖动并发
+		const handles = el.querySelectorAll(".best-mermaid-tune-layer circle.bm-tune-handle");
+		expect(handles.length).toBe(2);
+
+		down(handles[1], 170, 50);
+		move(170, 80);
+		up();
+
+		const pts = points(svg);
+		expect(pts).toHaveLength(2);
+		expect(pts[0].x).toBe(85);
+		expect(pts[1].x).toBe(170);
+	});
+
+	it("端点被拖到节点背面时改锚到面向线段的一侧（路径不穿过节点）", () => {
+		const { el, svg } = makeHarness();
+		press(el, "v");
+		down(svg, 120, 50); // 选中连线
+		up();
+		const handles = el.querySelectorAll(".best-mermaid-tune-layer circle.bm-tune-handle");
+
+		down(handles[1], 170, 50);
+		move(240, 50); // 指针在 B 的右侧
+		up();
+
+		const pts = points(svg);
+		// 相邻点在左侧，端点必须留在左侧，否则连线会从节点内部穿过、箭头被节点盖住
+		expect(pts[pts.length - 1].x).toBe(170);
+	});
+});

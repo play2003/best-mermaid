@@ -16,7 +16,9 @@ import {
 	edgeKey,
 	measureNodeBox,
 	nodeKey,
+	pinEndpoint,
 	sideOf,
+	simplifyPoints,
 	type Box,
 	type Point,
 } from "../pipeline/tune-overlay";
@@ -643,20 +645,21 @@ export class TuneModeService {
 				if (state.kind !== "endpoint") return;
 				const p = this.toUser(session, move.clientX, move.clientY);
 				if (!p) return;
-				const side = sideOf(state.box, p);
-				const current = this.sessionPoints(session, state.edgeId) ?? state.pts.map((q) => ({ ...q }));
+				const live = this.sessionPoints(session, state.edgeId) ?? state.pts;
+				// mermaid 的"直线"常带共线冗余点：先简化，否则只有最后一小段被折弯
+				const current = simplifyPoints(live, 1.5);
 				if (current.length < 2) return;
 				const index = state.end === 0 ? 0 : current.length - 1;
 				const neighbor = state.end === 0 ? current[1] : current[current.length - 2];
-				let anchor = anchorOnSide(state.box, side, p);
-				// 近水平/近垂直吸附：沿当前边滑动锚点，使首/末段精确水平或垂直
-				anchor = snapAnchor(state.box, side, anchor, neighbor);
 
-				current[index] = anchor;
+				// 吸附到面向相邻点的一侧：避免端点被拖到节点背面时路径穿过节点、箭头被盖住
+				const pinned = pinEndpoint(state.box, sideOf(state.box, p), p, neighbor);
+				// 近水平/近垂直吸附：沿当前边滑动锚点，使首/末段精确水平或垂直
+				current[index] = snapAnchor(state.box, pinned.side, pinned.point, neighbor);
 
 				const next: EdgeTune = { from: state.from, to: state.to, pts: current.map((q) => [q.x, q.y]) };
-				if (state.end === 0) next.src = side;
-				else next.dst = side;
+				if (state.end === 0) next.src = pinned.side;
+				else next.dst = pinned.side;
 				session.tune.edges = { ...(session.tune.edges ?? {}), [state.edgeId]: next };
 				this.markDirty(session);
 				this.applyTune(session);
@@ -709,21 +712,27 @@ export class TuneModeService {
 				}
 
 				// 首段/末段：把端点钉回节点边（沿边滑动），并保持该段水平/垂直
+				let finalSrcSide = srcSide;
+				let finalDstSide = dstSide;
 				if (state.index === 0 && srcBox && srcSide) {
-					next[0] = anchorOnSide(srcBox, srcSide, next[0]);
-					if (srcSide === "l" || srcSide === "r") next[1].y = next[0].y;
+					const pinned = pinEndpoint(srcBox, srcSide, next[0], next[1]);
+					next[0] = pinned.point;
+					finalSrcSide = pinned.side;
+					if (pinned.side === "l" || pinned.side === "r") next[1].y = next[0].y;
 					else next[1].x = next[0].x;
 				}
-				const lastIndex = pts.length - 2;
+				const lastIndex = state.pts.length - 2;
 				if (state.index === lastIndex && dstBox && dstSide) {
-					next[next.length - 1] = anchorOnSide(dstBox, dstSide, next[next.length - 1]);
-					if (dstSide === "l" || dstSide === "r") next[next.length - 2].y = next[next.length - 1].y;
+					const pinned = pinEndpoint(dstBox, dstSide, next[next.length - 1], next[next.length - 2]);
+					next[next.length - 1] = pinned.point;
+					finalDstSide = pinned.side;
+					if (pinned.side === "l" || pinned.side === "r") next[next.length - 2].y = next[next.length - 1].y;
 					else next[next.length - 2].x = next[next.length - 1].x;
 				}
 
 				const edge: EdgeTune = { from: state.from, to: state.to, pts: next.map((q) => [q.x, q.y]) };
-				if (srcSide) edge.src = srcSide;
-				if (dstSide) edge.dst = dstSide;
+				if (finalSrcSide) edge.src = finalSrcSide;
+				if (finalDstSide) edge.dst = finalDstSide;
 				session.tune.edges = { ...(session.tune.edges ?? {}), [state.edgeId]: edge };
 				this.markDirty(session);
 				this.applyTune(session);
