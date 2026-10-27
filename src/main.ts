@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Notice, Plugin } from "obsidian";
 import { BestMermaidSettingTab, DEFAULT_SETTINGS, type BestMermaidSettings } from "./settings";
 import type { PipelineDeps } from "./types";
 import { MermaidBlockProcessor } from "./pipeline/processor";
@@ -10,6 +10,8 @@ import { RenderCache } from "./services/cache";
 import { ThemeService } from "./services/theme-service";
 import { ErrorBoundary } from "./services/error-boundary";
 import { InteractionService } from "./services/interaction";
+import { TunePersistence } from "./services/tune-persistence";
+import { TuneModeService } from "./services/tune-mode";
 import { ExportService } from "./services/export";
 import { ExportDialog } from "./ui/export-dialog";
 import { StyleRegistry } from "./styles/registry";
@@ -25,6 +27,7 @@ export default class BestMermaidPlugin extends Plugin {
 	private themeService!: ThemeService;
 	private processor!: MermaidBlockProcessor;
 	private cache!: RenderCache;
+	private tune!: TuneModeService;
 
 	async onload() {
 		await this.loadSettings();
@@ -37,17 +40,30 @@ export default class BestMermaidPlugin extends Plugin {
 		this.cache = new RenderCache(this.settings.cacheLimit);
 		this.themeService = new ThemeService(() => this.onThemeChange());
 		const exporter = new ExportService();
+		const engine = new RenderEngine(this.manifest.id, () => this.settings.layoutEngine);
+		const interaction = new InteractionService(() => this.settings.zoomEnabled);
+		const tune = (this.tune = new TuneModeService({
+			isEnabled: () => this.settings.tuneEnabled !== false,
+			interaction,
+			persistence: new TunePersistence(this.app),
+			getRawSource: (el) => el.dataset.bmSource,
+			getCtx: (el) => this.processor.getCtx(el),
+			refresh: (el, source) => this.processor.renderWithSource(el, source),
+			validate: (source) => engine.validate(source),
+			notify: (message) => new Notice(message),
+		}));
 		// 装配：管线层（依赖注入，pipeline 不感知 services）
 		const deps: PipelineDeps = {
 			getSettings: () => this.settings,
 			registry: this.registry,
 			cache: this.cache,
 			themeResolver: new ThemeResolver((cleanup) => this.register(cleanup)),
-			engine: new RenderEngine(this.manifest.id, () => this.settings.layoutEngine),
+			engine,
 			normalizer: new SourceNormalizer("11", this.manifest.version),
 			postProcessor: new PostProcessor(),
 			errorBoundary: new ErrorBoundary(),
-			interaction: new InteractionService(() => this.settings.zoomEnabled),
+			interaction,
+			tune,
 			openExportDialog: (svg, defaults) => new ExportDialog(this.app, svg, defaults, exporter).open(),
 		};
 		this.processor = new MermaidBlockProcessor(deps);
@@ -63,6 +79,7 @@ export default class BestMermaidPlugin extends Plugin {
 
 	onunload() {
 		this.themeService.stop();
+		this.tune.dispose();
 		this.processor.stopWatch();
 	}
 

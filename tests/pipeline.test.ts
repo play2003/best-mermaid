@@ -6,6 +6,7 @@ import { RenderCache } from "../src/services/cache";
 import { follow } from "../src/styles/builtin/follow";
 import { midnight } from "../src/styles/builtin/midnight";
 import { resolveLayout } from "../src/pipeline/layout";
+import { nodeKey } from "../src/pipeline/tune-overlay";
 import { FakeExportDialog, GRAPH, makeDeps, sleep, waitFor } from "./pipeline.test-utils";
 import { ThemeResolver } from "../src/pipeline/theme-resolver";
 
@@ -414,5 +415,41 @@ describe("单元：RenderCache（LRU）", () => {
 		expect(c.get("b")).toBe("2b");
 		c.clear();
 		expect(c.get("b")).toBeUndefined();
+	});
+});
+
+describe("微调覆盖层集成（真实 mermaid 渲染）", () => {
+	it("bm-tune 指令渲染后重放：节点框尺寸被覆盖，tune 也传给编辑服务", async () => {
+		const { deps } = makeDeps();
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		const source = '%% bm-tune: {"v":1,"nodes":{"A":{"x":60,"y":30,"w":160,"h":60}}} %%\nflowchart LR\n    A[Start] --> B[End]';
+		processor.handle(source, el, {} as never);
+		await waitFor(() => el.querySelector(".best-mermaid-wrap svg") !== null);
+
+		const group = Array.from(el.querySelectorAll("g.node")).find((g) => nodeKey(g) === "A") as SVGGElement;
+		expect(group).toBeTruthy();
+		expect(group.getAttribute("transform")).toBe("translate(60, 30)");
+		const rect = group.querySelector("rect") as SVGRectElement;
+		expect(Number(rect.getAttribute("width"))).toBe(160);
+		expect(Number(rect.getAttribute("height"))).toBe(60);
+
+		// 编辑会话收到解析后的 tune 数据
+		const fake = deps.tune as unknown as { attached: Array<{ opts: { tune: { nodes?: Record<string, unknown> } } }> };
+		expect(fake.attached.at(-1)?.opts.tune.nodes?.A).toBeTruthy();
+	});
+
+	it("损坏的 bm-tune 不影响正常渲染", async () => {
+		const { deps } = makeDeps();
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		processor.handle('%% bm-tune: {broken %%\nflowchart LR\n    A[Start] --> B[End]', el, {} as never);
+		await waitFor(() => el.querySelector(".best-mermaid-wrap svg") !== null);
+		expect(el.querySelector(".best-mermaid-error")).toBeNull();
+		expect(Array.from(el.querySelectorAll("g.node")).some((g) => nodeKey(g) === "A")).toBe(true);
 	});
 });

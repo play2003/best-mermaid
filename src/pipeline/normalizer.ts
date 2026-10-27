@@ -1,4 +1,5 @@
-import type { NormalizedSource } from "../types";
+import type { NormalizedSource, TuneError } from "../types";
+import { parseTune } from "./tune-overlay";
 
 /**
  * 源码预处理器：
@@ -6,8 +7,11 @@ import type { NormalizedSource } from "../types";
  *    不留在源码里，避免 mermaid 原生处理绕过我们的合并优先级）
  * 2. 提取并剥离样式选择指令 %% bm-style: <id> %%（纯注释，mermaid 原生忽略，
  *    选择随源码走：复制图/同步笔记不丢）
- * 3. 剔除影响缓存的噪声（首尾空白）
- * 4. 缓存键 = hash(源码 + 指令 + 样式 + 主题画像 + 版本)，由 cacheKey() 单独生成
+ * 3. 提取并剥离微调指令 %% bm-tune: {...} %%（同样是纯注释；解析失败时剥离但不报错，
+ *    渲染退回默认，避免异常数据拖垮整张图）
+ * 4. 剔除影响缓存的噪声（首尾空白）
+ * 5. 缓存键 = hash(源码 + 指令 + 样式 + 主题画像 + 版本)，由 cacheKey() 单独生成；
+ *    微调数据不参与缓存键——它不改变 mermaid 输出，渲染后由覆盖层重放
  */
 export class SourceNormalizer {
 	constructor(
@@ -18,11 +22,15 @@ export class SourceNormalizer {
 	normalize(source: string): NormalizedSource {
 		const { clean, directive } = this.extractInit(source);
 		const { clean: clean2, styleId } = this.extractBmStyle(clean);
+		const { clean: clean3, raw: tuneRaw } = this.extractBmTune(clean2);
+		const parsed = tuneRaw === null ? { tune: null, error: null as TuneError } : parseTune(tuneRaw);
 
 		return {
-			source: clean2.trim(),
+			source: clean3.trim(),
 			directive,
 			styleId,
+			tune: parsed.tune,
+			tuneError: parsed.error,
 		};
 	}
 
@@ -72,6 +80,17 @@ export class SourceNormalizer {
 			return "";
 		});
 		return { clean, styleId };
+	}
+
+	/** 微调指令：%% bm-tune: {...} %%（允许多条，最后一条有效者胜；无效数据只废弃不报错） */
+	private extractBmTune(source: string): { clean: string; raw: string | null } {
+		const re = /^[ \t]*%%[ \t]*bm-tune:[ \t]*(.*?)[ \t]*%%[ \t]*$/gm;
+		let raw: string | null = null;
+		const clean = source.replace(re, (_m, body: string) => {
+			raw = body;
+			return "";
+		});
+		return { clean, raw };
 	}
 
 	/** 指令体是 JSON 或单引号风格，解析失败返回 null（原样留在源码，行为退回 mermaid 原生） */

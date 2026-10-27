@@ -4,12 +4,13 @@
  * - 左键拖拽平移，仅放大（scale>1）后可用，5px 位移阈值区分"点击"与"拖拽"
  * - 双击回 1x；缩放状态存容器 dataset，SVG 重建后 attach 时自动回放
  *
- * 无实例状态：容器被 Obsidian 替换时，其上的监听与 dataset 状态自然消亡。
+ * 监听用 AbortController 统一持有：attach 先 detach，修复重渲染导致监听累积的问题；
+ * suspend/resume 供微调模式锁定手势（编辑时坐标必须稳定在 1x）。
  */
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 8;
 /** 容器内覆盖按钮（导出等）：不参与缩放/拖拽/双击手势 */
-const OVERLAY_SELECTOR = ".best-mermaid-export";
+const OVERLAY_SELECTOR = ".best-mermaid-export, .best-mermaid-tune-btn, .best-mermaid-tune-hud, .bm-tune-inline-editor";
 /** 指数缩放步进：任意倍率下手感一致 */
 const ZOOM_STEP = 1.1;
 /** 位移超过该值才算拖拽（像素），阈值内松手视为点击 */
@@ -18,9 +19,14 @@ const DRAG_THRESHOLD = 5;
 const SNAP_DELAY = 180;
 
 export class InteractionService {
+	private controllers = new WeakMap<HTMLElement, AbortController>();
+	private snapTimers = new WeakMap<HTMLElement, number>();
+	private suspended = new WeakSet<HTMLElement>();
+
 	constructor(private enabled: () => boolean) {}
 
 	attach(container: HTMLElement, svg: SVGSVGElement): void {
+		this.detach(container);
 		if (!this.enabled()) return;
 
 		const state = {
@@ -36,7 +42,6 @@ export class InteractionService {
 		let downY = 0;
 		let lastX = 0;
 		let lastY = 0;
-		let snapTimer: number | undefined;
 
 		const apply = (animate = false) => {
 			svg.setCssStyles({
@@ -48,6 +53,14 @@ export class InteractionService {
 			container.dataset.bmTy = String(state.ty);
 			// 小手光标：放大后可拖（悬停 grab / 拖拽中 grabbing）
 			container.setCssStyles({ cursor: state.scale > 1 ? (dragging ? "grabbing" : "grab") : "" });
+		};
+
+		const clearSnapTimer = () => {
+			const timer = this.snapTimers.get(container);
+			if (timer !== undefined) {
+				window.clearTimeout(timer);
+				this.snapTimers.delete(container);
+			}
 		};
 
 		/** 清除落在本图容器内的文字选区（缩放手势开始时调用；不影响页面上其他选区） */
@@ -87,15 +100,17 @@ export class InteractionService {
 			target instanceof Element && target.closest(OVERLAY_SELECTOR) !== null;
 
 		const onWheel = (ev: WheelEvent) => {
+			if (this.suspended.has(container)) return;
 			if (isOverlayTarget(ev.target)) return;
 			if (!ev.ctrlKey) return; // 不拦截普通滚动
 			ev.preventDefault();
-			window.clearTimeout(snapTimer);
+			clearSnapTimer();
 			zoomAt(ev.clientX, ev.clientY, ev.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP);
-			snapTimer = window.setTimeout(snapBack, SNAP_DELAY);
+			this.snapTimers.set(container, window.setTimeout(snapBack, SNAP_DELAY));
 		};
 
 		const onDown = (ev: PointerEvent) => {
+			if (this.suspended.has(container)) return;
 			if (isOverlayTarget(ev.target)) return;
 			if (ev.button !== 0 || state.scale <= 1) return; // 未放大时不抢占，文本可选中
 			// 关键：浏览器在首次轻微移动时就会建立文字选区，若等超过 5px 阈值再禁用，
@@ -110,6 +125,7 @@ export class InteractionService {
 		};
 
 		const onMove = (ev: PointerEvent) => {
+			if (this.suspended.has(container)) return;
 			if (ev.buttons !== 1 || state.scale <= 1) return;
 			if (!dragging && Math.hypot(ev.clientX - downX, ev.clientY - downY) < DRAG_THRESHOLD) return;
 			if (!dragging) {
@@ -138,6 +154,7 @@ export class InteractionService {
 		};
 
 		const onDblClick = (ev: MouseEvent) => {
+			if (this.suspended.has(container)) return;
 			if (isOverlayTarget(ev.target)) return;
 			if (state.scale === 1 && state.tx === 0 && state.ty === 0) return;
 			ev.preventDefault();
@@ -147,13 +164,57 @@ export class InteractionService {
 			apply(true);
 		};
 
-		container.addEventListener("wheel", onWheel, { passive: false });
-		container.addEventListener("pointerdown", onDown);
-		container.addEventListener("pointermove", onMove);
-		container.addEventListener("pointerup", onUp);
-		container.addEventListener("pointercancel", onUp);
-		container.addEventListener("dblclick", onDblClick);
+		const controller = new AbortController();
+		const { signal } = controller;
+		this.controllers.set(container, controller);
+		container.addEventListener("wheel", onWheel, { passive: false, signal });
+		container.addEventListener("pointerdown", onDown, { signal });
+		container.addEventListener("pointermove", onMove, { signal });
+		container.addEventListener("pointerup", onUp, { signal });
+		container.addEventListener("pointercancel", onUp, { signal });
+		container.addEventListener("dblclick", onDblClick, { signal });
 
 		apply(); // 回放容器 dataset 中的既有状态（SVG 可能刚被 Obsidian 重建）
+	}
+
+	/** 移除容器上的全部手势监听（重渲染/编辑模式/卸载） */
+	detach(container: HTMLElement): void {
+		this.controllers.get(container)?.abort();
+		this.controllers.delete(container);
+		const timer = this.snapTimers.get(container);
+		if (timer !== undefined) {
+			window.clearTimeout(timer);
+			this.snapTimers.delete(container);
+		}
+	}
+
+	/** 暂停手势（微调模式）：不卸载监听，仅让处理器提前返回 */
+	suspend(container: HTMLElement): void {
+		this.suspended.add(container);
+		const timer = this.snapTimers.get(container);
+		if (timer !== undefined) {
+			window.clearTimeout(timer);
+			this.snapTimers.delete(container);
+		}
+	}
+
+	resume(container: HTMLElement): void {
+		this.suspended.delete(container);
+	}
+
+	isSuspended(container: HTMLElement): boolean {
+		return this.suspended.has(container);
+	}
+
+	/**
+	 * 复位到 1x：微调模式的坐标基准；不恢复此前缩放（避免编辑后坐标错位）。
+	 * 只改 dataset 与内联样式，不触发手势状态。
+	 */
+	reset(container: HTMLElement, svg: SVGSVGElement): void {
+		container.dataset.bmScale = "1";
+		container.dataset.bmTx = "0";
+		container.dataset.bmTy = "0";
+		svg.setCssStyles({ transform: "", transition: "" });
+		container.setCssStyles({ cursor: "" });
 	}
 }

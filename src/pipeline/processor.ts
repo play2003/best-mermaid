@@ -1,6 +1,7 @@
 import type { MarkdownPostProcessorContext } from "obsidian";
 import type { PipelineDeps, ThemeProfile } from "../types";
 import { resolveLayout } from "./layout";
+import { applyTuneOverlay } from "./tune-overlay";
 import { buildPngFilename } from "../services/export";
 
 /**
@@ -31,6 +32,8 @@ export class MermaidBlockProcessor {
 	private observer: MutationObserver | null = null;
 	/** 每容器守卫：内置 mermaid 渲染器覆盖我方输出时立即夺回（事件驱动，无窗口期） */
 	private guards = new Map<HTMLElement, MutationObserver>();
+	/** 每容器最近一次处理器上下文：rerenderAll / 微调保存需要 getSectionInfo */
+	private ctxByEl = new WeakMap<HTMLElement, MarkdownPostProcessorContext>();
 
 	constructor(private deps: PipelineDeps) {}
 
@@ -83,6 +86,7 @@ export class MermaidBlockProcessor {
 	}
 
 	handle = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext): void => {
+		this.ctxByEl.set(el, ctx);
 		// 记录来源笔记与图序号（导出文件名 = 笔记名 + 序号）；dataset 随容器克隆保留
 		const sourcePath = ctx.sourcePath ?? "";
 		if (el.dataset.bmSourcePath !== sourcePath) {
@@ -126,7 +130,17 @@ export class MermaidBlockProcessor {
 		}
 	}
 
-	private async render(source: string, el: HTMLElement, opts: { skipDebounce?: boolean } = {}): Promise<void> {
+	/** 用给定源码立即重渲染（微调保存/取消/重置后调用） */
+	renderWithSource(el: HTMLElement, source: string): void {
+		void this.render(source, el);
+	}
+
+	/** 微调保存需要 section info 定位代码块 */
+	getCtx(el: HTMLElement): MarkdownPostProcessorContext | null {
+		return this.ctxByEl.get(el) ?? null;
+	}
+
+	private async render(source: string, el: HTMLElement): Promise<void> {
 		// 渲染序号：容器上同刻只允许最新一轮渲染落笔（守卫夺回与排队渲染并发时，
 		// 旧一轮的 await 迟于新一轮完成，会把重复 SVG 叠加写入）
 		const seq = (this.seq.get(el) ?? 0) + 1;
@@ -141,6 +155,8 @@ export class MermaidBlockProcessor {
 		// 水平对齐：容器可能复用，先清旧类再加新类
 		el.removeClass("bm-align-left", "bm-align-center", "bm-align-right");
 		el.addClass(`bm-align-${this.deps.getSettings().imageAlign}`);
+		// 重渲染优先于未保存的微调：先结束编辑会话（其监听/覆盖层随旧 svg 一起废弃）
+		this.deps.tune.detach(el);
 		this.clearOwn(el);
 
 		this.beginPass();
@@ -191,7 +207,17 @@ export class MermaidBlockProcessor {
 			const svgEl = this.deps.postProcessor.enhance(el, svg, (target) =>
 				this.deps.openExportDialog(target, { filename, background }),
 			);
-			if (svgEl) this.deps.interaction.attach(el, svgEl);
+			if (svgEl) {
+				// 微调覆盖必须在交互绑定前重放：几何变化会影响可交互区域
+				applyTuneOverlay(svgEl, normalized.tune);
+				this.deps.interaction.attach(el, svgEl);
+				this.deps.tune.attach(el, svgEl, {
+					tune: normalized.tune,
+					tuneError: normalized.tuneError,
+					rawSource: source,
+					ctx: this.ctxByEl.get(el) ?? null,
+				});
+			}
 			this.attachGuard(el, source);
 			this.passStats && (this.passStats.enhanceMs += performance.now() - e0);
 			this.passStats && (this.passStats.count++, (this.passStats.lastDoneAt = performance.now()));
@@ -281,9 +307,18 @@ export class MermaidBlockProcessor {
 	 * 其他插件对同一容器通常有"只注入一次"守卫，清掉了它们不会补回来。
 	 */
 	private clearOwn(el: HTMLElement): void {
-		const own = ["best-mermaid-wrap", "best-mermaid-badge", "best-mermaid-error", "best-mermaid-export"];
+		const own = [
+			"best-mermaid-wrap",
+			"best-mermaid-badge",
+			"best-mermaid-error",
+			"best-mermaid-export",
+			"best-mermaid-tune-btn",
+			"best-mermaid-tune-hud",
+			"best-mermaid-tune-layer",
+		];
 		for (const child of Array.from(el.children)) {
-			if (own.some((cls) => child.hasClass(cls))) child.remove();
+			// 用 classList 而非 Obsidian 的 hasClass：覆盖层是 SVG 元素，不保证有 DOM 扩展方法
+			if (own.some((cls) => child.classList.contains(cls))) child.remove();
 		}
 	}
 }

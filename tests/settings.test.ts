@@ -39,3 +39,13 @@ describe("样式画廊（声明式设置 render 行）", () => {
 		expect(el.querySelectorAll(".bm-style-card")).toHaveLength(2);
 	});
 });
+
+describe("微调模式设置", () => {
+	it("提供 enableTune 开关且默认开启", () => {
+		const { tab } = makeTab();
+		const defs = tab.getSettingDefinitions() as Array<{ control?: { key?: string } }>;
+		const tune = defs.find((d) => d.control?.key === "tuneEnabled");
+		expect(tune).toBeTruthy();
+		expect(DEFAULT_SETTINGS.tuneEnabled).toBe(true);
+	});
+});

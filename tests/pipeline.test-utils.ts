@@ -15,6 +15,9 @@ import type { PipelineDeps, PngExportOptions } from "../src/types";
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** 每个测试引擎的唯一 vault id：mermaid 的渲染 id 基于它，重复会导致同 id 冲突 */
+let depsSeq = 0;
+
 /** 轮询等待条件成立（替代固定 sleep，避免机器负载导致的偶发失败） */
 export async function waitFor(cond: () => boolean, timeout = 8000): Promise<void> {
 	const start = Date.now();
@@ -25,6 +28,22 @@ export async function waitFor(cond: () => boolean, timeout = 8000): Promise<void
 }
 
 export const GRAPH = "flowchart LR\n    A[Start] --> B[End]";
+
+/** 测试用微调服务：记录 attach 参数，不创建任何 UI */
+export class FakeTuneMode {
+	attached: Array<{ el: HTMLElement; svg: SVGSVGElement; opts: unknown }> = [];
+	detached: HTMLElement[] = [];
+	attach(el: HTMLElement, svg: SVGSVGElement, opts: unknown): void {
+		this.attached.push({ el, svg, opts });
+	}
+	detach(el: HTMLElement): void {
+		this.detached.push(el);
+	}
+	isEditing(): boolean {
+		return false;
+	}
+	dispose(): void {}
+}
 
 /** 测试用导出对话框：只记录打开请求，不触达 Obsidian UI */
 export class FakeExportDialog {
@@ -47,6 +66,8 @@ export function makeDeps(
 		imageAlign: "left",
 		layoutEngine: "auto",
 		userStyles: [],
+		tuneEnabled: true,
+		perfLog: false,
 		...overrides,
 	};
 	const registry = new StyleRegistry([follow, midnight, paper, terra]);
@@ -55,11 +76,12 @@ export function makeDeps(
 		registry,
 		cache: new RenderCache(50),
 		themeResolver: new ThemeResolver(),
-		engine: new RenderEngine("test", () => settings.layoutEngine),
+		engine: new RenderEngine(`test-${++depsSeq}`, () => settings.layoutEngine),
 		normalizer: new SourceNormalizer("11", "0.1.0"),
 		postProcessor: new PostProcessor(),
 		errorBoundary: new ErrorBoundary(),
 		interaction: new InteractionService(() => settings.zoomEnabled),
+		tune: new FakeTuneMode() as unknown as PipelineDeps["tune"],
 		openExportDialog: () => {},
 		...extraDeps,
 	};

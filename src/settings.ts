@@ -20,6 +20,8 @@ export interface BestMermaidSettings {
 	layoutEngine: "auto" | "dagre" | "elk";
 	/** 用户自定义样式卡（持久化） */
 	userStyles: StyleCard[];
+	/** 启用 V 键微调模式（流程图） */
+	tuneEnabled: boolean;
 	/** 在控制台输出渲染耗时统计（性能诊断用） */
 	perfLog: boolean;
 }
@@ -33,6 +35,7 @@ export const DEFAULT_SETTINGS: BestMermaidSettings = {
 	imageAlign: "left",
 	layoutEngine: "auto",
 	userStyles: [],
+	tuneEnabled: true,
 	perfLog: false,
 };
 
@@ -80,6 +83,11 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 				name: t("enableZoom"),
 				control: { type: "toggle", key: "zoomEnabled", defaultValue: DEFAULT_SETTINGS.zoomEnabled },
 			},
+			{
+				name: t("enableTune"),
+				desc: t("enableTuneDesc"),
+				control: { type: "toggle", key: "tuneEnabled", defaultValue: DEFAULT_SETTINGS.tuneEnabled },
+			},
 			// perfLog（性能日志）不在设置页展示：诊断用，需要时在插件 data.json 里手动加 "perfLog": true
 			{
 				name: t("styles"),
@@ -101,7 +109,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		const record = this.plugin.settings as unknown as Record<string, unknown>;
 		record[key] = key === "debounceMs" ? Math.max(0, Number(value) || 0) : value;
 		await this.plugin.saveSettings();
-		if (key === "layoutEngine" || key === "imageAlign") this.plugin.onStyleChange();
+		if (key === "layoutEngine" || key === "imageAlign" || key === "tuneEnabled") this.plugin.onStyleChange();
 	}
 
 	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作）。

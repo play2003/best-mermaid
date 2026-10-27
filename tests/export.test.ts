@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { buildPngFilename, fitExportSize, ExportService } from "../src/services/export";
+import { applyTuneOverlay } from "../src/pipeline/tune-overlay";
 
 describe("buildPngFilename", () => {
 	it("去扩展名 + 非法字符替换 + 序号", () => {
@@ -89,5 +90,34 @@ describe("exportPng 完整管线（mock canvas/Image/URL）", () => {
 		expect(serialized).not.toContain('width="100%"');
 
 		vi.unstubAllGlobals();
+	});
+});
+
+describe("微调几何随导出（深克隆自动带走）", () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	it("导出 SVG 包含覆盖后的节点尺寸", () => {
+		const downloads: string[] = [];
+		vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:mock");
+		vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+		vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+			downloads.push(this.download);
+		});
+		const spySerialize = vi.spyOn(XMLSerializer.prototype, "serializeToString");
+
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		svg.setAttribute("id", "bm-tuned");
+		svg.setAttribute("viewBox", "0 0 200 100");
+		const markup = `<g class="node" id="flowchart-A-0" transform="translate(50, 50)"><rect x="-35" y="-18" width="70" height="36"></rect></g>`;
+		const group = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg">${markup}</svg>`, "image/svg+xml")
+			.documentElement.firstElementChild!;
+		svg.appendChild(document.importNode(group, true));
+		applyTuneOverlay(svg, { v: 1, nodes: { A: { x: 50, y: 50, w: 120, h: 60 } } });
+
+		new ExportService().exportSvg(svg, "tuned");
+		expect(downloads).toEqual(["tuned.svg"]);
+		const serialized = spySerialize.mock.results[0]?.value as string;
+		expect(serialized).toContain('width="120"');
+		expect(serialized).toContain('height="60"');
 	});
 });

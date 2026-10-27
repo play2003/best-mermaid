@@ -50,3 +50,14 @@ describe("i18n 跟随 Obsidian 语言设置", () => {
 		expect(tStyle({ name: "Custom", description: "x" }).name).toBe("Custom");
 	});
 });
+
+describe("微调模式文案", () => {
+	it("中英文均存在", () => {
+		setLocale("en");
+		expect(t("tuneMode")).toBe("Fine-tune diagram");
+		expect(t("tuneSave")).toBe("Save");
+		setLocale("zh-cn");
+		expect(t("tuneMode")).toBe("微调图表");
+		expect(t("tuneSaved")).toBe("图表微调已保存");
+	});
+});

@@ -151,6 +151,20 @@ export class RenderEngine {
 		}
 	}
 
+	/**
+	 * 保存前语法预校验：微调会改写源码，写盘前先确认仍是合法 mermaid，
+	 * 避免把语法错误写进用户笔记。返回 null=通过，否则为错误信息。
+	 */
+	async validate(source: string): Promise<string | null> {
+		const mermaid = await this.load();
+		try {
+			await mermaid.parse(source);
+			return null;
+		} catch (error) {
+			return error instanceof Error ? error.message : String(error);
+		}
+	}
+
 	/** 全局唯一渲染 id：vault 前缀 + 自增计数 */
 	private nextRenderId(): string {
 		return `bm-${this.vaultId}-${++this.counter}`;

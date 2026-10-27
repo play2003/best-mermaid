@@ -86,3 +86,55 @@ describe("交互层：导出按钮不参与缩放/拖拽/双击手势", () => {
 		expect(selection.isCollapsed).toBe(false);
 	});
 });
+
+describe("交互层：监听生命周期（回归：重渲染累积监听）", () => {
+	function setupZoom() {
+		const container = document.createElement("div");
+		const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+		container.appendChild(svg);
+		document.body.appendChild(container);
+		container.getBoundingClientRect = () => ({ left: 0, top: 0 }) as DOMRect;
+		const service = new InteractionService(() => true);
+		service.attach(container, svg);
+		service.attach(container, svg); // 重渲染会重复 attach
+		return { container, svg, service };
+	}
+
+	it("重复 attach 只保留一份监听（一次滚轮只缩放一步）", () => {
+		const { container, svg } = setupZoom();
+		container.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, deltaY: -100, bubbles: true, cancelable: true }));
+		expect(svg.style.transform).toContain("scale(1.1)");
+		expect(svg.style.transform).not.toContain("scale(1.21");
+	});
+
+	it("suspend 后手势不生效，resume 后恢复", () => {
+		const { container, svg, service } = setupZoom();
+		service.suspend(container);
+		const wheel = new WheelEvent("wheel", { ctrlKey: true, deltaY: -100, bubbles: true, cancelable: true });
+		container.dispatchEvent(wheel);
+		expect(wheel.defaultPrevented).toBe(false);
+		expect(svg.style.transform ?? "").not.toContain("scale(1.1");
+
+		service.resume(container);
+		container.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, deltaY: -100, bubbles: true, cancelable: true }));
+		expect(svg.style.transform).toContain("scale(1.1)");
+	});
+
+	it("detach 后不再响应手势", () => {
+		const { container, svg, service } = setupZoom();
+		service.detach(container);
+		const wheel = new WheelEvent("wheel", { ctrlKey: true, deltaY: -100, bubbles: true, cancelable: true });
+		container.dispatchEvent(wheel);
+		expect(wheel.defaultPrevented).toBe(false);
+		expect(svg.style.transform ?? "").not.toContain("scale(1.1");
+	});
+
+	it("reset 把 dataset 与 svg transform 复位到 1x", () => {
+		const { container, svg, service } = setupZoom();
+		container.dispatchEvent(new WheelEvent("wheel", { ctrlKey: true, deltaY: -100, bubbles: true, cancelable: true }));
+		service.reset(container, svg);
+		expect(container.dataset.bmScale).toBe("1");
+		expect(container.dataset.bmTx).toBe("0");
+		expect(svg.style.transform).toBe("");
+	});
+});

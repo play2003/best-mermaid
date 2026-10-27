@@ -241,3 +241,151 @@
 	color: var(--text-faint);
 	font-size: 0.92em;
 }
+
+/* ── V 键微调模式 ───────────────────────────────────────────── */
+
+.best-mermaid-container:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+/* 悬停显示的铅笔入口（与导出按钮同风格，锚在左下角） */
+.best-mermaid-tune-btn {
+	position: absolute;
+	left: 4px;
+	bottom: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	margin: 0;
+	padding: 0;
+	color: var(--text-faint);
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	box-shadow: none;
+	opacity: 0.35;
+	cursor: pointer;
+	transition: opacity 0.12s ease;
+}
+
+.best-mermaid-tune-btn svg {
+	width: 12px;
+	height: 12px;
+}
+
+.best-mermaid-container:hover .best-mermaid-tune-btn,
+.best-mermaid-tune-btn:hover,
+.best-mermaid-tune-btn:focus-visible {
+	opacity: 0.9;
+	color: var(--text-normal);
+}
+
+/* 覆盖层：容器绝对定位的兄弟 svg，不进入文档流（不干扰 mermaid width="100%" 的尺寸解析） */
+.best-mermaid-tune-layer {
+	position: absolute;
+	z-index: 5;
+	overflow: visible;
+	pointer-events: none;
+	max-width: none;
+	transition: none;
+}
+
+.bm-tune-outline {
+	fill: none;
+	stroke: var(--interactive-accent);
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.bm-tune-edge-hl {
+	fill: none;
+	stroke: var(--interactive-accent);
+	stroke-width: 2;
+	stroke-dasharray: 4 3;
+	vector-effect: non-scaling-stroke;
+	pointer-events: none;
+}
+
+.bm-tune-handle {
+	fill: var(--background-primary);
+	stroke: var(--interactive-accent);
+	stroke-width: 1.5;
+	vector-effect: non-scaling-stroke;
+	pointer-events: all;
+	cursor: crosshair;
+}
+
+.best-mermaid-tune-hud {
+	position: absolute;
+	top: 4px;
+	left: 4px;
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 6px;
+	border-radius: 6px;
+	background: var(--background-secondary);
+	border: 1px solid var(--interactive-accent);
+	font-size: 11px;
+	color: var(--text-muted);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.bm-tune-hint {
+	max-width: 360px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.bm-tune-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	margin: 0;
+	padding: 0;
+	background: transparent;
+	border: none;
+	box-shadow: none;
+	color: var(--text-normal);
+	cursor: pointer;
+}
+
+.bm-tune-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.bm-tune-btn:hover {
+	color: var(--interactive-accent);
+}
+
+.bm-tune-dirty::after {
+	content: "●";
+	color: var(--interactive-accent);
+	font-size: 8px;
+}
+
+.bm-tune-inline-editor {
+	position: absolute;
+	z-index: 7;
+	min-height: 28px;
+	padding: 4px 6px;
+	font-size: 12px;
+	border: 1px solid var(--interactive-accent);
+	border-radius: 4px;
+	background: var(--background-primary);
+	color: var(--text-normal);
+	resize: both;
+}
+
+.best-mermaid-container.bm-tuning svg {
+	transition: none;
+}
