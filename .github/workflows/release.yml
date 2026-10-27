@@ -21,7 +21,8 @@ jobs:
           node-version: "20"
           cache: npm
 
-      - run: npm ci
+      # layout-elk 声明 peer mermaid@^12，本插件使用 mermaid 11——本地与 CI 统一用 legacy 绕过
+      - run: npm ci --legacy-peer-deps
 
       - name: Type-check & build
         run: npm run build
