@@ -108,8 +108,10 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 		if (key === "layoutEngine" || key === "imageAlign") this.plugin.onStyleChange();
 	}
 
-	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作） */
+	/** 样式画廊：卡片网格（色板 + 名称 + 说明 + 操作）。
+	 *  声明式 API 每次 update() 都会重新调用 render —— 先移除自己的旧网格再重建，避免翻倍。 */
 	private renderStyleGallery(container: HTMLElement): void {
+		container.querySelector(":scope > .bm-style-grid")?.remove();
 		const grid = container.createDiv({ cls: "bm-style-grid" });
 		for (const style of this.plugin.registry.list()) {
 			this.renderStyleCard(grid, style);
