@@ -41,6 +41,8 @@ const HANDLE_PX = 9;
 const MIN_W = 40;
 const MIN_H = 24;
 const DRAG_START = 3;
+/** 端点拖动时，线段接近水平/垂直的吸附角（弧度） */
+const SNAP_ANGLE = (5 * Math.PI) / 180;
 /** 悬停后按 V 的有效窗口（毫秒） */
 const HOVER_WINDOW = 800;
 
@@ -642,10 +644,15 @@ export class TuneModeService {
 				const p = this.toUser(session, move.clientX, move.clientY);
 				if (!p) return;
 				const side = sideOf(state.box, p);
-				const anchor = anchorOnSide(state.box, side, p);
 				const current = this.sessionPoints(session, state.edgeId) ?? state.pts.map((q) => ({ ...q }));
 				if (current.length < 2) return;
-				current[state.end === 0 ? 0 : current.length - 1] = anchor;
+				const index = state.end === 0 ? 0 : current.length - 1;
+				const neighbor = state.end === 0 ? current[1] : current[current.length - 2];
+				let anchor = anchorOnSide(state.box, side, p);
+				// 近水平/近垂直吸附：沿当前边滑动锚点，使首/末段精确水平或垂直
+				anchor = snapAnchor(state.box, side, anchor, neighbor);
+
+				current[index] = anchor;
 
 				const next: EdgeTune = { from: state.from, to: state.to, pts: current.map((q) => [q.x, q.y]) };
 				if (state.end === 0) next.src = side;
@@ -667,8 +674,18 @@ export class TuneModeService {
 	): void {
 		const start = this.toUser(session, ev.clientX, ev.clientY);
 		const pts = decodePoints(pathEl);
-		if (!start || !pts || pts.length < 2) return;
+		if (!start || !pts || pts.length < 3) return; // 两点直线两端都锚在节点上，没有可平移的中间段
 		const index = nearestSegment(pts, start);
+
+		// 首/末段端点必须保持连接：记录所在节点与当前锚边（拖动时沿边滑动，不脱离节点）
+		const tuned = session.tune.edges?.[edgeId];
+		const srcGroup = findNodeGroup(session.svg, from);
+		const dstGroup = findNodeGroup(session.svg, to);
+		const srcBox = srcGroup ? measureNodeBox(srcGroup) : null;
+		const dstBox = dstGroup ? measureNodeBox(dstGroup) : null;
+		const srcSide = tuned?.src ?? (srcBox ? sideOf(srcBox, pts[1]) : undefined);
+		const dstSide = tuned?.dst ?? (dstBox ? sideOf(dstBox, pts[pts.length - 2]) : undefined);
+
 		this.trackDrag(
 			session,
 			{ kind: "segment", edgeId, from, to, index, start, pts },
@@ -690,10 +707,24 @@ export class TuneModeService {
 					next[state.index].x = a.x + nx;
 					next[state.index + 1].x = b.x + nx;
 				}
-				session.tune.edges = {
-					...(session.tune.edges ?? {}),
-					[state.edgeId]: { from: state.from, to: state.to, pts: next.map((q) => [q.x, q.y]) },
-				};
+
+				// 首段/末段：把端点钉回节点边（沿边滑动），并保持该段水平/垂直
+				if (state.index === 0 && srcBox && srcSide) {
+					next[0] = anchorOnSide(srcBox, srcSide, next[0]);
+					if (srcSide === "l" || srcSide === "r") next[1].y = next[0].y;
+					else next[1].x = next[0].x;
+				}
+				const lastIndex = pts.length - 2;
+				if (state.index === lastIndex && dstBox && dstSide) {
+					next[next.length - 1] = anchorOnSide(dstBox, dstSide, next[next.length - 1]);
+					if (dstSide === "l" || dstSide === "r") next[next.length - 2].y = next[next.length - 1].y;
+					else next[next.length - 2].x = next[next.length - 1].x;
+				}
+
+				const edge: EdgeTune = { from: state.from, to: state.to, pts: next.map((q) => [q.x, q.y]) };
+				if (srcSide) edge.src = srcSide;
+				if (dstSide) edge.dst = dstSide;
+				session.tune.edges = { ...(session.tune.edges ?? {}), [state.edgeId]: edge };
 				this.markDirty(session);
 				this.applyTune(session);
 			},
@@ -991,6 +1022,24 @@ function viewBoxOf(svg: SVGSVGElement): { x: number; y: number; width: number; h
 	const width = Number(svg.getAttribute("width"));
 	const height = Number(svg.getAttribute("height"));
 	return width > 0 && height > 0 ? { x: 0, y: 0, width, height } : null;
+}
+
+/** 锚点吸附：线段接近水平/垂直时，沿节点边滑动锚点，使首/末段精确轴对齐 */
+function snapAnchor(box: Box, side: "l" | "r" | "t" | "b", anchor: Point, neighbor: Point): Point {
+	if (side === "l" || side === "r") {
+		const dx = Math.abs(neighbor.x - anchor.x);
+		const dy = Math.abs(neighbor.y - anchor.y);
+		if (dx > 1e-6 && Math.atan2(dy, dx) < SNAP_ANGLE) {
+			return anchorOnSide(box, side, { x: anchor.x, y: neighbor.y });
+		}
+		return anchor;
+	}
+	const dx = Math.abs(neighbor.x - anchor.x);
+	const dy = Math.abs(neighbor.y - anchor.y);
+	if (dy > 1e-6 && Math.atan2(dx, dy) < SNAP_ANGLE) {
+		return anchorOnSide(box, side, { x: neighbor.x, y: anchor.y });
+	}
+	return anchor;
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {

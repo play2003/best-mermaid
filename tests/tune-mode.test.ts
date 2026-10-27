@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { TuneModeService } from "../src/services/tune-mode";
 import type { TuneModeDeps } from "../src/services/tune-mode";
 import { sleep, waitFor } from "./pipeline.test-utils";
+import { decodePoints } from "../src/pipeline/tune-overlay";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const GRAPH = "flowchart LR\n    A[Start] --> B[End]";
@@ -221,5 +222,64 @@ describe("V 键微调：连线选中的命中容差", () => {
 		expect(el.querySelector(".bm-tune-outline")).toBeTruthy();
 		down(svg, 280, 180);
 		expect(el.querySelector(".bm-tune-outline")).toBeNull();
+	});
+});
+
+describe("V 键微调：连线拖动的吸附与节点连接", () => {
+	const down = (target: Element, x: number, y: number) =>
+		target.dispatchEvent(
+			new PointerEvent("pointerdown", { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true }),
+		);
+	const move = (x: number, y: number) =>
+		window.dispatchEvent(new PointerEvent("pointermove", { clientX: x, clientY: y, buttons: 1, bubbles: true }));
+	const up = () => window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+	const points = (svg: SVGSVGElement) => decodePoints(svg.querySelector("path[data-id]")!)!;
+
+	it("端点拖动接近水平时吸附（锚点沿节点边滑动）", () => {
+		const { el, svg } = makeHarness();
+		press(el, "v");
+		down(svg, 120, 50); // 选中连线
+		const overlay = el.querySelector(".best-mermaid-tune-layer")!;
+		const startHandle = overlay.querySelectorAll("circle.bm-tune-handle")[0];
+		expect(startHandle).toBeTruthy();
+
+		down(startHandle, 85, 50);
+		move(90, 57); // 目标锚点 y=57，与另一端 y=50 相差 7（约 4.7°）→ 应吸附到水平
+		up();
+
+		const pts = points(svg);
+		expect(pts[0].x).toBe(85);
+		expect(pts[0].y).toBe(50);
+	});
+
+	it("角度超过阈值时不吸附", () => {
+		const { el, svg } = makeHarness();
+		press(el, "v");
+		down(svg, 120, 50);
+		const overlay = el.querySelector(".best-mermaid-tune-layer")!;
+		const startHandle = overlay.querySelectorAll("circle.bm-tune-handle")[0];
+
+		down(startHandle, 85, 50);
+		move(90, 64); // 差值 14，约 9.3° → 不吸附
+		up();
+
+		expect(points(svg)[0].y).toBe(64);
+	});
+
+	it("拖动带端点的首段时端点保持贴在节点边（不脱离）", () => {
+		const { el, svg } = makeHarness();
+		const path = svg.querySelector("path[data-id]")!;
+		path.setAttribute("data-id", "L_B_A_0");
+		path.setAttribute("d", "M 170,50 L 150,50 L 150,120");
+
+		press(el, "v");
+		down(path, 160, 50); // 选中并抓住首段（B 的左边界 → 中间折点）
+		move(160, 40); // 向上平移 10
+		up();
+
+		const pts = points(svg);
+		expect(pts[0].x).toBe(170); // 仍贴在 B 的左边界
+		expect(pts[0].y).toBe(40);
+		expect(pts[1].y).toBe(40); // 首段保持水平
 	});
 });

@@ -221,7 +221,11 @@ export function applyTuneOverlay(
 		const points = tuneEdge?.pts ? tuneEdge.pts.map(([x, y]) => ({ x, y })) : decodePoints(pathEl);
 		if (!points || points.length < 2) continue;
 
-		if (!tuneEdge?.pts) {
+		if (tuneEdge?.pts) {
+			// 已保存的点集：端点沿节点边滑动回边界（节点缩放后仍保持连接，不脱离）
+			if (srcBox && tuneEdge.src) points[0] = anchorOnSide(srcBox, tuneEdge.src, points[0]);
+			if (dstBox && tuneEdge.dst) points[points.length - 1] = anchorOnSide(dstBox, tuneEdge.dst, points[points.length - 1]);
+		} else {
 			if (srcBox) reanchorEnd(points, 0, srcBox, tuneEdge?.src);
 			if (dstBox) reanchorEnd(points, points.length - 1, dstBox, tuneEdge?.dst);
 		}
