@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MermaidBlockProcessor } from "../src/pipeline/processor";
 import { SourceNormalizer } from "../src/pipeline/normalizer";
 import { StyleRegistry } from "../src/styles/registry";
