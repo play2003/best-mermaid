@@ -68,10 +68,15 @@ export class MermaidBlockProcessor {
 		const prev = this.timers.get(el);
 		if (prev !== undefined) window.clearTimeout(prev);
 
+		// 首次渲染（新元素）不等防抖：阅读视图打开/切换是"每元素一次"的场景，
+		// 打字防抖（合并连续输入）只对已渲染过的元素有意义
+		const isFirstRender = el.dataset.bmSource === undefined;
+		const delay = isFirstRender ? 0 : this.deps.getSettings().debounceMs;
+
 		const timer = window.setTimeout(() => {
 			this.timers.delete(el);
 			void this.render(source, el);
-		}, this.deps.getSettings().debounceMs);
+		}, delay);
 
 		this.timers.set(el, timer);
 	};

@@ -225,6 +225,19 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		expect(fake.calls.at(-1)?.options?.filename).toBe("a-1");
 	});
 
+	it("首次渲染跳过打字防抖（阅读视图打开提速）", async () => {
+		const { deps } = makeDeps({ debounceMs: 300 });
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		const t0 = Date.now();
+		processor.handle(GRAPH, el, {} as never);
+		await waitFor(() => el.querySelector("svg") !== null, 3000);
+		// 未等待 300ms 防抖即完成首次渲染
+		expect(Date.now() - t0).toBeLessThan(300);
+	});
+
 	it("bm-style 图级指令覆盖全局默认样式", async () => {
 		const { deps } = makeDeps();
 		const processor = new MermaidBlockProcessor(deps);
