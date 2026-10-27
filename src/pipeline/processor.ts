@@ -16,7 +16,14 @@ export class MermaidBlockProcessor {
 	/** 主题画像缓存：同配置多图复用一次解析结果（getComputedStyle 代价高），rerenderAll 时失效 */
 	private themeCache = new Map<string, ThemeProfile>();
 	/** 当前渲染批次的耗时统计（perfLog 开启时输出汇总） */
-	private passStats: { count: number; themeMs: number; renderMs: number; enhanceMs: number } | null = null;
+	private passStats: {
+		count: number;
+		themeMs: number;
+		renderMs: number;
+		enhanceMs: number;
+		firstAt: number;
+		lastDoneAt: number;
+	} | null = null;
 	private passTimer: number | undefined;
 	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
 	private version = 0;
@@ -30,21 +37,38 @@ export class MermaidBlockProcessor {
 	/** 插件 onload 时启动（onunload 调 stopWatch 清理） */
 	startWatch(): void {
 		if (this.observer) return;
+		// 回调批处理：文档构建期间 body 会有大量 DOM 变更，逐条同步处理
+		// （querySelectorAll 等）会干扰 Obsidian 的渲染主线程；收集后每帧处理一次
+		let pending: HTMLElement[] = [];
+		let scheduled = false;
+		const schedule = () => {
+			if (scheduled) return;
+			scheduled = true;
+			requestAnimationFrame(() => {
+				scheduled = false;
+				const candidates = pending;
+				pending = [];
+				for (const el of candidates) {
+					const src = el.dataset.bmSource;
+					if (src !== undefined && el.dataset.bmVersion !== String(this.version) && el.isConnected) {
+						void this.render(src, el);
+					}
+				}
+			});
+		};
+
 		this.observer = new MutationObserver((mutations) => {
 			for (const m of mutations) {
 				for (const node of Array.from(m.addedNodes)) {
 					if (!node.instanceOf(HTMLElement)) continue;
-					const targets = node.matches(".best-mermaid-container")
-						? [node]
-						: Array.from(node.querySelectorAll<HTMLElement>(".best-mermaid-container"));
-					for (const el of targets) {
-						const src = el.dataset.bmSource;
-						if (src !== undefined && el.dataset.bmVersion !== String(this.version)) {
-							void this.render(src, el);
-						}
+					if (node.matches(".best-mermaid-container")) {
+						pending.push(node);
+					} else if (node.querySelector(".best-mermaid-container")) {
+						pending.push(...Array.from(node.querySelectorAll<HTMLElement>(".best-mermaid-container")));
 					}
 				}
 			}
+			if (pending.length > 0) schedule();
 		});
 		this.observer.observe(document.body, { childList: true, subtree: true });
 	}
@@ -170,7 +194,7 @@ export class MermaidBlockProcessor {
 			if (svgEl) this.deps.interaction.attach(el, svgEl);
 			this.attachGuard(el, source);
 			this.passStats && (this.passStats.enhanceMs += performance.now() - e0);
-			this.passStats && this.passStats.count++;
+			this.passStats && (this.passStats.count++, (this.passStats.lastDoneAt = performance.now()));
 		} catch (e) {
 			this.deps.errorBoundary.render(el, e, source);
 		} finally {
@@ -180,7 +204,16 @@ export class MermaidBlockProcessor {
 
 	/** 开启一个渲染批次统计（同批次 = 短时间窗口内的连续渲染，如一次打开/切换） */
 	private beginPass(): void {
-		if (!this.passStats) this.passStats = { count: 0, themeMs: 0, renderMs: 0, enhanceMs: 0 };
+		if (!this.passStats) {
+			this.passStats = {
+				count: 0,
+				themeMs: 0,
+				renderMs: 0,
+				enhanceMs: 0,
+				firstAt: performance.now(),
+				lastDoneAt: 0,
+			};
+		}
 		if (this.passTimer !== undefined) window.clearTimeout(this.passTimer);
 	}
 
@@ -193,9 +226,12 @@ export class MermaidBlockProcessor {
 			this.passStats = null;
 			if (!stats || !this.deps.getSettings().perfLog || stats.count === 0) return;
 			const total = stats.themeMs + stats.renderMs + stats.enhanceMs;
+			// span = 首 handle → 末渲染完成的窗口；若 span 远大于 total，
+			// 说明大头在等待（Obsidian 解析/调度），不在本插件
+			const span = stats.lastDoneAt - stats.firstAt;
 			console.info(
-				`[best-mermaid] ${stats.count} diagrams in ${total.toFixed(0)}ms ` +
-					`(theme ${stats.themeMs.toFixed(0)}ms, mermaid ${stats.renderMs.toFixed(0)}ms, enhance ${stats.enhanceMs.toFixed(0)}ms)`,
+				`[best-mermaid] ${stats.count} diagrams in ${total.toFixed(0)}ms (span ${span.toFixed(0)}ms) ` +
+					`[theme ${stats.themeMs.toFixed(0)}, mermaid ${stats.renderMs.toFixed(0)}, enhance ${stats.enhanceMs.toFixed(0)}]`,
 			);
 		}, 600);
 	}
