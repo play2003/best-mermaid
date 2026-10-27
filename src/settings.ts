@@ -20,6 +20,8 @@ export interface BestMermaidSettings {
 	layoutEngine: "auto" | "dagre" | "elk";
 	/** 用户自定义样式卡（持久化） */
 	userStyles: StyleCard[];
+	/** 在控制台输出渲染耗时统计（性能诊断用） */
+	perfLog: boolean;
 }
 
 export const DEFAULT_SETTINGS: BestMermaidSettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: BestMermaidSettings = {
 	imageAlign: "left",
 	layoutEngine: "auto",
 	userStyles: [],
+	perfLog: false,
 };
 
 export class BestMermaidSettingTab extends PluginSettingTab {
@@ -76,6 +79,11 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 			{
 				name: t("enableZoom"),
 				control: { type: "toggle", key: "zoomEnabled", defaultValue: DEFAULT_SETTINGS.zoomEnabled },
+			},
+			{
+				name: t("perfLog"),
+				desc: t("perfLogDesc"),
+				control: { type: "toggle", key: "perfLog", defaultValue: false },
 			},
 			{
 				name: t("styles"),

@@ -7,6 +7,7 @@ import { follow } from "../src/styles/builtin/follow";
 import { midnight } from "../src/styles/builtin/midnight";
 import { resolveLayout } from "../src/pipeline/layout";
 import { FakeExportDialog, GRAPH, makeDeps, sleep, waitFor } from "./pipeline.test-utils";
+import { ThemeResolver } from "../src/pipeline/theme-resolver";
 
 describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 	it("离屏分离树：connected=false 的容器也要渲染（回归：启动全灭）", async () => {
@@ -223,6 +224,49 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		el1.querySelector<HTMLButtonElement>(".best-mermaid-export")!.click();
 		await sleep(0);
 		expect(fake.calls.at(-1)?.options?.filename).toBe("a-1");
+	});
+
+	it("同配置多图复用主题画像（探针解析只跑一次）", async () => {
+		let calls = 0;
+		const real = new ThemeResolver();
+		const spy = {
+			resolve: (style: Parameters<ThemeResolver["resolve"]>[0]) => {
+				calls++;
+				return real.resolve(style);
+			},
+		};
+		const { deps } = makeDeps({}, { themeResolver: spy as ThemeResolver });
+		const processor = new MermaidBlockProcessor(deps);
+
+		const el1 = document.createElement("div");
+		const el2 = document.createElement("div");
+		document.body.append(el1, el2);
+		processor.handle(GRAPH, el1, {} as never);
+		processor.handle(GRAPH, el2, {} as never);
+		await waitFor(() => el1.querySelector("svg") !== null && el2.querySelector("svg") !== null, 5000);
+
+		expect(calls).toBe(1);
+	});
+
+	it("perfLog 开启时输出批次耗时汇总（默认关闭不输出）", async () => {
+		const info = vi.spyOn(console, "info").mockImplementation(() => {});
+		const { deps, settings } = makeDeps({ perfLog: false });
+		const processor = new MermaidBlockProcessor(deps);
+		const el = document.createElement("div");
+		document.body.appendChild(el);
+
+		processor.handle(GRAPH, el, {} as never);
+		await sleep(900); // 批次静默窗口 600ms
+		expect(info).not.toHaveBeenCalled();
+
+		settings.perfLog = true;
+		const el2 = document.createElement("div");
+		document.body.appendChild(el2);
+		processor.handle(GRAPH, el2, {} as never);
+		await sleep(900);
+		expect(info).toHaveBeenCalledTimes(1);
+		expect(info.mock.calls[0][0]).toContain("1 diagrams in");
+		info.mockRestore();
 	});
 
 	it("首次渲染跳过打字防抖（阅读视图打开提速）", async () => {

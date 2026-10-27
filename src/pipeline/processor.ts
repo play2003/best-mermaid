@@ -13,6 +13,11 @@ export class MermaidBlockProcessor {
 	private seq = new WeakMap<HTMLElement, number>();
 	/** 每笔记的图序号计数器（导出文件名用） */
 	private figureCounters = new Map<string, number>();
+	/** 主题画像缓存：同配置多图复用一次解析结果（getComputedStyle 代价高），rerenderAll 时失效 */
+	private themeCache = new Map<string, ThemeProfile>();
+	/** 当前渲染批次的耗时统计（perfLog 开启时输出汇总） */
+	private passStats: { count: number; themeMs: number; renderMs: number; enhanceMs: number } | null = null;
+	private passTimer: number | undefined;
 	/** 渲染配方版本：样式/主题/对齐等变化时 +1，用于识别懒加载区块的过期渲染 */
 	private version = 0;
 	/** 监听懒加载区块进入 DOM，补渲染版本过期的容器 */
@@ -50,6 +55,7 @@ export class MermaidBlockProcessor {
 		for (const guard of this.guards.values()) guard.disconnect();
 		this.guards.clear();
 		this.figureCounters.clear();
+		this.themeCache.clear();
 	}
 
 	handle = (source: string, el: HTMLElement, ctx: MarkdownPostProcessorContext): void => {
@@ -89,6 +95,7 @@ export class MermaidBlockProcessor {
 	 */
 	rerenderAll(): void {
 		this.version++; // 使所有现存渲染过期
+		this.themeCache.clear(); // 主题/样式可能已变
 		for (const el of Array.from(document.querySelectorAll<HTMLElement>(".best-mermaid-container"))) {
 			const src = el.dataset.bmSource;
 			if (src !== undefined) void this.render(src, el);
@@ -112,29 +119,45 @@ export class MermaidBlockProcessor {
 		el.addClass(`bm-align-${this.deps.getSettings().imageAlign}`);
 		this.clearOwn(el);
 
+		this.beginPass();
 		try {
 			// 解析链：图上 bm-style 指令 > 全局默认样式 > 内置兜底
+			const t0 = performance.now();
 			const normalized = this.deps.normalizer.normalize(source);
 			const settings = this.deps.getSettings();
 			const style = this.deps.registry.get(normalized.styleId ?? settings.defaultStyleId)
 				?? this.deps.registry.getFallback();
-			const theme = this.deps.themeResolver.resolve(style);
+			// 主题画像按 (样式id@亮暗) 缓存：探针 getComputedStyle 代价高，同配置多图只算一次
+			const dark = document.body.classList.contains("theme-dark");
+			const themeKey = `${style.id}@${dark}`;
+			let theme = this.themeCache.get(themeKey);
+			if (!theme) {
+				theme = this.deps.themeResolver.resolve(style);
+				this.themeCache.set(themeKey, theme);
+			}
+			const themeMs = performance.now() - t0;
+			this.passStats && (this.passStats.themeMs += themeMs);
+
 			const directive = normalized.directive;
 			const cacheKey = this.deps.normalizer.cacheKey(
 				normalized,
 				theme.id,
-				resolveLayout(directive, theme, this.deps.getSettings().layoutEngine).layout,
+				resolveLayout(directive, theme, settings.layoutEngine).layout,
 			);
 
+			const r0 = performance.now();
 			let svg = this.deps.cache.get(cacheKey);
 			if (svg === undefined) {
 				svg = await this.deps.engine.render(normalized.source, theme, directive);
 				this.deps.cache.put(cacheKey, svg);
 			}
+			const renderMs = performance.now() - r0;
+			this.passStats && (this.passStats.renderMs += renderMs);
 
 			// await 期间可能有更新一轮的渲染已启动：本轮过期，放弃落笔
 			if (this.seq.get(el) !== seq) return;
 
+			const e0 = performance.now();
 			const filename = buildPngFilename(
 				el.dataset.bmSourcePath ?? "",
 				el.dataset.bmFigureIndex ?? "1",
@@ -146,9 +169,35 @@ export class MermaidBlockProcessor {
 			);
 			if (svgEl) this.deps.interaction.attach(el, svgEl);
 			this.attachGuard(el, source);
+			this.passStats && (this.passStats.enhanceMs += performance.now() - e0);
+			this.passStats && this.passStats.count++;
 		} catch (e) {
 			this.deps.errorBoundary.render(el, e, source);
+		} finally {
+			this.endPassSoon();
 		}
+	}
+
+	/** 开启一个渲染批次统计（同批次 = 短时间窗口内的连续渲染，如一次打开/切换） */
+	private beginPass(): void {
+		if (!this.passStats) this.passStats = { count: 0, themeMs: 0, renderMs: 0, enhanceMs: 0 };
+		if (this.passTimer !== undefined) window.clearTimeout(this.passTimer);
+	}
+
+	/** 批次静默 600ms 后输出一次汇总（仅 perfLog 开启时） */
+	private endPassSoon(): void {
+		if (this.passTimer !== undefined) window.clearTimeout(this.passTimer);
+		this.passTimer = window.setTimeout(() => {
+			this.passTimer = undefined;
+			const stats = this.passStats;
+			this.passStats = null;
+			if (!stats || !this.deps.getSettings().perfLog || stats.count === 0) return;
+			const total = stats.themeMs + stats.renderMs + stats.enhanceMs;
+			console.info(
+				`[best-mermaid] ${stats.count} diagrams in ${total.toFixed(0)}ms ` +
+					`(theme ${stats.themeMs.toFixed(0)}ms, mermaid ${stats.renderMs.toFixed(0)}ms, enhance ${stats.enhanceMs.toFixed(0)}ms)`,
+			);
+		}, 600);
 	}
 
 	/**
