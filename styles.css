@@ -170,22 +170,74 @@
 	top: var(--size-2-2);
 }
 
-/* 错误可视化 */
+/* 错误可视化：结构化诊断（哪里错/为什么/怎么修）+ 原始信息折叠 */
 .best-mermaid-error {
 	border: 1px solid var(--background-modifier-error);
 	background: var(--background-secondary);
 	border-radius: 6px;
-	padding: 8px 12px;
+	padding: 10px 12px;
 	font-size: 0.85em;
-	color: var(--text-error);
+	color: var(--text-normal);
+	line-height: 1.5;
 }
 
-.best-mermaid-error .bm-error-msg {
+.best-mermaid-error .bm-error-title {
 	font-weight: 600;
+	color: var(--text-error);
 	margin-bottom: 4px;
 }
 
-.best-mermaid-error pre {
-	margin: 4px 0 0;
+.best-mermaid-error .bm-error-reason {
+	margin: 2px 0;
+}
+
+.best-mermaid-error .bm-error-suggestion {
+	margin: 6px 0 2px;
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.best-mermaid-error .bm-error-suggestion-label {
 	color: var(--text-muted);
+	flex-shrink: 0;
+}
+
+.best-mermaid-error .bm-error-suggestion code {
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	padding: 1px 6px;
+	border-radius: 4px;
+	font-size: 0.95em;
+	word-break: break-all;
+}
+
+.best-mermaid-error .bm-error-line {
+	margin: 6px 0 0;
+	color: var(--text-muted);
+	background: var(--background-primary);
+	border-left: 3px solid var(--background-modifier-error);
+	padding: 4px 8px;
+	border-radius: 4px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.best-mermaid-error .bm-error-details {
+	margin-top: 8px;
+	color: var(--text-muted);
+}
+
+.best-mermaid-error .bm-error-details summary {
+	cursor: pointer;
+	user-select: none;
+}
+
+.best-mermaid-error .bm-error-details pre {
+	margin: 6px 0 0;
+	white-space: pre-wrap;
+	word-break: break-all;
+	color: var(--text-faint);
+	font-size: 0.92em;
 }

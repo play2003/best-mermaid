@@ -11,7 +11,12 @@ describe("i18n 跟随 Obsidian 语言设置", () => {
 	it("英文（默认）", () => {
 		setLocale("en");
 		expect(t("styles")).toBe("Styles");
-		expect(t("renderFailed")).toBe("Mermaid render failed");
+		expect(t("errorTitleTemplate").replace("{n}", "13")).toBe("Diagram syntax error (line 13)");
+	});
+	it("错误框文案", () => {
+		setLocale("zh-cn");
+		expect(t("errorTitleTemplate").replace("{n}", "13")).toBe("图表语法错误（第 13 行）");
+		expect(t("unquotedParens")).toContain("引号");
 	});
 	it("中文（zh/zh-cn）", () => {
 		setLocale("zh");
