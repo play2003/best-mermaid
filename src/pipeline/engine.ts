@@ -5,19 +5,26 @@ type MermaidApi = (typeof import("mermaid"))["default"];
 
 /**
  * 渲染引擎：mermaid 的唯一调用点。
- * - 懒加载：首次渲染才 import("mermaid")（体积 ~1MB+，不能拖慢插件启动）
- * - 唯一渲染 id：规避 mermaid SVG 内部节点 id 冲突（已知坑，必须在此收口）
+ * - 懒加载：首次渲染才 import("mermaid")（体积大，不能拖慢插件启动）
+ * - 唯一渲染 id：规避 mermaid SVG 内部节点 id 冲突（已知坑，在此收口）
+ * - 配置批次：mermaid.initialize 是全局可变状态——同配置的多张图**只 initialize
+ *   一次并并发渲染**（打开文档的主要提速点）；配置变化时先等旧批清空再切换，
+ *   保证任何时刻"全局配置 → 在飞渲染"的一致性
  */
 export class RenderEngine {
 	private mermaidPromise: Promise<MermaidApi> | null = null;
 	private elkRegistered = false;
 	private elkWarned = false;
 	private counter = 0;
-	/**
-	 * 渲染串行队列。mermaid.initialize 是全局可变状态，
-	 * 并发渲染会互相覆盖配置（A 的主题色被 B 的冲掉），必须 initialize→render 整体串行。
-	 */
-	private queue: Promise<unknown> = Promise.resolve();
+
+	/** 当前批次的配置签名（JSON 串）；null = 无有效批次 */
+	private batchSig: string | null = null;
+	/** 当前批次全部完成的 gate（下一个不同配置的批次等它） */
+	private batchDone: Promise<void> = Promise.resolve();
+	private batchRelease: (() => void) | null = null;
+	private batchInflight = 0;
+	/** 批次切换互斥：并发出现的不同配置排队切换，避免 initialize 交叉 */
+	private switchLock: Promise<void> = Promise.resolve();
 
 	constructor(
 		private vaultId: string,
@@ -25,42 +32,39 @@ export class RenderEngine {
 	) {}
 
 	async render(source: string, theme: ThemeProfile, directive?: Record<string, unknown> | null): Promise<string> {
-		const run = this.queue.then(() => this.doRenderWithTimeout(source, theme, directive));
-		this.queue = run.catch(() => {}); // 单图失败不阻断后续渲染
-		return run;
+		const config = await this.buildConfig(theme, directive);
+		const sig = JSON.stringify(config);
+
+		if (sig !== this.batchSig) {
+			await this.switchLock.then(async () => {
+				await this.batchDone;
+				// 双检：等待期间同签名的请求可能已建批
+				if (sig !== this.batchSig) {
+					const mermaid = await this.load();
+					mermaid.initialize(config);
+					this.batchSig = sig;
+					this.batchInflight = 0;
+					this.batchDone = new Promise<void>((resolve) => {
+						this.batchRelease = resolve;
+					});
+				}
+			});
+		}
+
+		this.batchInflight++;
+		try {
+			return await this.doRenderWithTimeout(source, config);
+		} finally {
+			if (--this.batchInflight === 0) this.batchRelease?.();
+		}
 	}
 
-	/**
-	 * 单图渲染超时保护：个别图在真实环境（Electron/字体/布局）可能让 mermaid.render
-	 * 永不返回，串行队列会被堵死，其后所有图空白。超时转为失败 → 错误框可见化，
-	 * 队列放行后续图。
-	 */
-	private doRenderWithTimeout(
-		source: string,
+	/** 构建完整 mermaid 配置（initialize 的全部输入；批次签名即它的 JSON） */
+	private async buildConfig(
 		theme: ThemeProfile,
 		directive?: Record<string, unknown> | null,
-	): Promise<string> {
-		const TIMEOUT = 15_000;
-		let timer: number | undefined;
-		const timeout = new Promise<never>((_, reject) => {
-			timer = window.setTimeout(
-				() => reject(new Error(`Mermaid render timed out after ${TIMEOUT / 1000}s (diagram too complex or engine hung)`)),
-				TIMEOUT,
-			);
-		});
-		return Promise.race([this.doRender(source, theme, directive), timeout]).finally(() => {
-			if (timer !== undefined) window.clearTimeout(timer);
-		});
-	}
-
-	private async doRender(
-		source: string,
-		theme: ThemeProfile,
-		directive?: Record<string, unknown> | null,
-	): Promise<string> {
+	): Promise<Record<string, unknown>> {
 		const mermaid = await this.load();
-		const id = this.nextRenderId();
-
 		const config: Record<string, unknown> = {
 			startOnLoad: false,
 			securityLevel: "strict",
@@ -98,7 +102,30 @@ export class RenderEngine {
 		}
 
 		if (directive) this.applyDirective(config, directive);
-		mermaid.initialize(config);
+		return config;
+	}
+
+	/**
+	 * 单图渲染超时保护：个别图在真实环境（Electron/字体/布局）可能让 mermaid.render
+	 * 永不返回。超时转为失败 → 错误框可见化；批次由 finally 的计数自然放行。
+	 */
+	private doRenderWithTimeout(source: string, config: Record<string, unknown>): Promise<string> {
+		const TIMEOUT = 15_000;
+		let timer: number | undefined;
+		const timeout = new Promise<never>((_, reject) => {
+			timer = window.setTimeout(
+				() => reject(new Error(`Mermaid render timed out after ${TIMEOUT / 1000}s (diagram too complex or engine hung)`)),
+				TIMEOUT,
+			);
+		});
+		return Promise.race([this.doRender(source, config), timeout]).finally(() => {
+			if (timer !== undefined) window.clearTimeout(timer);
+		});
+	}
+
+	private async doRender(source: string, config: Record<string, unknown>): Promise<string> {
+		const mermaid = await this.load();
+		const id = this.nextRenderId();
 
 		try {
 			const { svg } = await mermaid.render(id, source);
@@ -106,8 +133,10 @@ export class RenderEngine {
 		} catch (e) {
 			// render 失败时 mermaid 可能留下临时 DOM（id 的元素），清理掉避免污染预览
 			document.getElementById(id)?.remove();
-			// elk 布局阶段失败（如个别图结构 elk 不支持）：降级 dagre 重试一次
+			// elk 布局阶段失败（如个别图结构 elk 不支持）：本图降级 dagre 重试一次。
+			// 配置被改变 → 批次作废（后续渲染重建批次），避免在飞渲染拿到混合配置
 			if (config.layout === "elk") {
+				this.batchSig = null;
 				const fallbackId = this.nextRenderId();
 				try {
 					mermaid.initialize({ ...config, layout: "dagre", elk: {} });

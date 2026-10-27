@@ -269,6 +269,29 @@ describe("管线集成（jsdom + 真实 mermaid 渲染）", () => {
 		info.mockRestore();
 	});
 
+	it("混合配置并发渲染：批次切换后三张图全部成功", async () => {
+		const { deps } = makeDeps();
+		const processor = new MermaidBlockProcessor(deps);
+		const els = [0, 1, 2].map(() => {
+			const el = document.createElement("div");
+			document.body.appendChild(el);
+			return el;
+		});
+
+		// 图2 带 init 指令（配置不同），三张同时提交
+		processor.handle(GRAPH, els[0], {} as never);
+		processor.handle("flowchart LR\n    X --> Y", els[1], {} as never);
+		processor.handle('%%{init: {"themeVariables": {"primaryColor": "#ff0000"}}}%%\nflowchart LR\n    P --> Q', els[2], {} as never);
+		await waitFor(
+			() => els.every((el) => el.querySelector("svg") !== null),
+			8000,
+		);
+
+		for (const el of els) {
+			expect(el.querySelector(".best-mermaid-error")).toBeNull();
+		}
+	});
+
 	it("首次渲染跳过打字防抖（阅读视图打开提速）", async () => {
 		const { deps } = makeDeps({ debounceMs: 300 });
 		const processor = new MermaidBlockProcessor(deps);
