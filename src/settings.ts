@@ -80,11 +80,7 @@ export class BestMermaidSettingTab extends PluginSettingTab {
 				name: t("enableZoom"),
 				control: { type: "toggle", key: "zoomEnabled", defaultValue: DEFAULT_SETTINGS.zoomEnabled },
 			},
-			{
-				name: t("perfLog"),
-				desc: t("perfLogDesc"),
-				control: { type: "toggle", key: "perfLog", defaultValue: false },
-			},
+			// perfLog（性能日志）不在设置页展示：诊断用，需要时在插件 data.json 里手动加 "perfLog": true
 			{
 				name: t("styles"),
 				desc: t("stylesDesc"),
