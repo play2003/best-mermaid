@@ -24,6 +24,11 @@ jobs:
       # layout-elk 声明 peer mermaid@^12，本插件使用 mermaid 11——本地与 CI 统一用 legacy 绕过
       - run: npm ci --legacy-peer-deps
 
+      # 版本门禁：manifest / package / versions 三处必须一致，且与 tag 一致。
+      # 1.0.3 曾因三处未对齐，把 manifest 写着 1.0.2 的包发了出去。
+      - name: Verify version consistency
+        run: node scripts/check-version.mjs "${{ github.ref_name }}"
+
       - name: Type-check & build
         run: npm run build
 
