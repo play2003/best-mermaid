@@ -1,7 +1,7 @@
 import { Notice, Plugin } from "obsidian";
 import { BestMermaidSettingTab, DEFAULT_SETTINGS, type BestMermaidSettings } from "./settings";
 import type { PipelineDeps } from "./types";
-import { MermaidBlockProcessor } from "./pipeline/processor";
+import { MermaidBlockProcessor, MERMAID_BLOCK_SORT_ORDER } from "./pipeline/processor";
 import { SourceNormalizer } from "./pipeline/normalizer";
 import { ThemeResolver } from "./pipeline/theme-resolver";
 import { RenderEngine } from "./pipeline/engine";
@@ -69,8 +69,14 @@ export default class BestMermaidPlugin extends Plugin {
 		this.processor = new MermaidBlockProcessor(deps);
 		this.processor.startWatch();
 
-		// 接管 ```mermaid 代码块渲染
-		this.registerMarkdownCodeBlockProcessor("mermaid", this.processor.handle);
+		// 接管 ```mermaid 代码块渲染。
+		// sortOrder 必须为负：Obsidian 1.15 的内置渲染器会在同一轮同步把代码块
+		// 换成 <div class="mermaid">，同为 0 且 core 先跑就会让我们扫不到目标。
+		this.registerMarkdownCodeBlockProcessor(
+			"mermaid",
+			this.processor.handle,
+			MERMAID_BLOCK_SORT_ORDER,
+		);
 		this.themeService.start();
 		this.addSettingTab(new BestMermaidSettingTab(this.app, this));
 

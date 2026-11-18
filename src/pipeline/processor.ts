@@ -5,6 +5,20 @@ import { applyTuneOverlay } from "./tune-overlay";
 import { buildPngFilename } from "../services/export";
 
 /**
+ * 代码块处理器的 sortOrder：必须为负，抢在 Obsidian 内置 mermaid 处理器之前进场。
+ *
+ * Obsidian 1.15 把内置 mermaid 渲染器从 /lib/mermaid.min.js（异步 render 后替换）
+ * 换成了 /lib/pele.min.js：库已加载时 `qH` 走 `if (R5.loaded) { e(); return }`，
+ * 在同一个 post-processor 调用里**同步**把 `<pre><code class="language-mermaid">`
+ * 换成 `<div class="mermaid">`。
+ * 两者 sortOrder 同为 0 且 core 先注册，于是它先把节点拿走；我们的
+ * createCodeBlockPostProcessor 随后 `findAll("code.language-mermaid")` 返回空，
+ * 处理器根本不会被调用 —— 表现为插件完全不接管、直接退回内置渲染。
+ * 负数保证我们先进场完成替换，内置处理器随后扫不到目标而自然空转。
+ */
+export const MERMAID_BLOCK_SORT_ORDER = -100;
+
+/**
  * 代码块处理器：渲染管线的调度入口。
  * 职责极薄 —— 防抖调度 + 容器管理，不含渲染逻辑。
  */
